@@ -60,12 +60,13 @@ env = environ.Env(
     STATIC_ROOT=(str, BASE_DIR / "data/static"),
     # Email
     EMAIL_BACKEND=(str, "django.core.mail.backends.console.EmailBackend"),
-    DEFAULT_FROM_EMAIL=(str, "mrcs-drm@example.com"),
+    DEFAULT_FROM_EMAIL=(str),
     EMAIL_API_URL=(str, None),
     EMAIL_API_KEY=(str, None),
     EMAIL_API_TIMEOUT=(int, 30),
     # Celery / Redis
-    CELERY_REDIS_URL=(str, "redis://localhost:6379/0"),
+    CELERY_REDIS_URL=str,
+    CACHE_REDIS_URL=str,
 )
 
 APP_DOMAIN = urlparse(env("APP_DOMAIN"))
@@ -281,11 +282,7 @@ EMAIL_API_KEY = env("EMAIL_API_KEY")
 EMAIL_API_TIMEOUT = env("EMAIL_API_TIMEOUT")
 
 # Celery
-_celery_redis_url = env("CELERY_REDIS_URL")
-CELERY_BROKER_URL = _celery_redis_url
-CELERY_RESULT_BACKEND = _celery_redis_url
-CELERY_TASK_ALWAYS_EAGER = APP_TYPE == "WEB" and DEBUG  # run tasks inline in dev web process if no worker
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TIMEZONE = TIME_ZONE
+CELERY_REDIS_URL = env("CELERY_REDIS_URL")
+CACHE_REDIS_URL = env("CACHE_REDIS_URL")
+CELERY_BROKER_URL = CELERY_REDIS_URL
+CELERY_RESULT_BACKEND = CELERY_REDIS_URL
