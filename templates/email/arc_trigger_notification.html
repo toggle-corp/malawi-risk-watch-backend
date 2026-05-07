@@ -1,0 +1,37 @@
+{% extends "email/base.html" %}
+
+{% block title %}ARC Parametric Trigger Alert — {{ trigger_date }}{% endblock %}
+
+{% block header %}ARC Parametric Trigger Alert{% endblock %}
+
+{% block subtext %}
+  An ARC parametric rainfall trigger event for <strong>{{ trigger_date }}</strong> has been
+  confirmed by MRCS staff. The following details have been recorded.
+{% endblock %}
+
+{% block content %}
+  <table class="details">
+    <tr>
+      <td class="label">Trigger Date</td>
+      <td class="value">{{ trigger_date }}</td>
+    </tr>
+    <tr>
+      <td class="label">Affected Areas</td>
+      <td class="value">{{ triggered_admin_areas_count }} administrative area(s)</td>
+    </tr>
+    <tr>
+      <td class="label">Confirmed By</td>
+      <td class="value">{{ reviewed_by }}</td>
+    </tr>
+    <tr>
+      <td class="label">Confirmed At</td>
+      <td class="value">{{ reviewed_at }}</td>
+    </tr>
+    {% if review_notes %}
+    <tr>
+      <td class="label">Notes</td>
+      <td class="value">{{ review_notes }}</td>
+    </tr>
+    {% endif %}
+  </table>
+{% endblock %}

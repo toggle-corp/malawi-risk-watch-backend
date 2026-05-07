@@ -1,0 +1,77 @@
+x-server: &base_server_setup
+  build:
+    context: ./
+  stdin_open: true
+  tty: true
+  environment: &base_server_environments
+    DEBUG: ${DEBUG:-true}
+    APP_ENVIRONMENT: ${APP_ENVIRONMENT:-DEV}
+    APP_TYPE: ${APP_TYPE:-WEB}
+    DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?error}
+    # Domain configs
+    APP_DOMAIN: ${APP_DOMAIN:-http://localhost:8000}
+    FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:-http://localhost:3000}
+    SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-localhost}
+    CSRF_COOKIE_DOMAIN: ${CSRF_COOKIE_DOMAIN:-localhost}
+    # Postgres — HOST is hardcoded to the compose service name, never localhost
+    POSTGRES_DB: ${POSTGRES_DB:-malawi}
+    POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    POSTGRES_HOST: db
+    POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+    TIME_ZONE: ${TIME_ZONE:-UTC}
+    # Redis / Celery
+    CELERY_REDIS_URL: ${CELERY_REDIS_URL:-redis://redis:6379/0}
+    # Email
+    EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+    DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-mrcs-drm@example.com}
+    EMAIL_API_URL: ${EMAIL_API_URL:-}
+    EMAIL_API_KEY: ${EMAIL_API_KEY:-}
+    EMAIL_API_TIMEOUT: ${EMAIL_API_TIMEOUT:-30}
+  env_file:
+    - path: ${BACKEND_ENV_FILE:-.env}
+      required: false
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  volumes:
+    - ./:/code/
+    - ipython_data_local:/root/.ipython/profile_default
+  depends_on:
+    - db
+    - redis
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    environment:
+      POSTGRES_DB: malawi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+  web:
+    <<: *base_server_setup
+    command: ["/code/misc/dev/run_web.sh"]
+    environment:
+      <<: *base_server_environments
+      APP_TYPE: "WEB"
+    ports:
+      - 127.0.0.1:8000:8000
+
+  worker:
+    <<: *base_server_setup
+    command: ["/code/misc/dev/run_worker.sh"]
+    environment:
+      <<: *base_server_environments
+      APP_TYPE: "WORKER"
+
+volumes:
+  postgres_data:
+  redis_data:
+  ipython_data_local:

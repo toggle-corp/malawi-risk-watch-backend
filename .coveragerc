@@ -1,0 +1,24 @@
+[run]
+branch = true
+source = .
+parallel = true
+concurrency = multiprocessing
+omit =
+    */migrations/*
+    */management/*
+    sitecustomize.py
+    */wsgi.py
+    */asgi.py
+    manage.py
+    **/apps.py
+    **/urls.py
+    **/tests.py
+    **/test_*.py
+
+[report]
+show_missing = true
+exclude_lines =
+    if 0:
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    if typing.TYPE_CHECKING:

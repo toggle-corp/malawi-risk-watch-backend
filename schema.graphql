@@ -1,0 +1,560 @@
+directive @oneOf on INPUT_OBJECT
+
+"""
+Malawi administrative boundary reference table.
+
+Levels (provisional):
+    0 = Country
+    1 = Region
+    2 = District
+    3 = Traditional Authority
+    4 = Village Cluster / Zone
+
+The geometry column (GEOMETRY(MultiPolygon, 4326)) is added via RunSQL
+in the migration and is not mapped to a Django field — boundaries will
+be ingested separately once real HDX data is wired up.
+"""
+input AdminAreaFilter {
+  id: ID
+  level: Int
+  parentId: ID
+  AND: AdminAreaFilter
+  OR: AdminAreaFilter
+  NOT: AdminAreaFilter
+  DISTINCT: Boolean
+  search: String
+}
+
+input AdminAreaOrder @oneOf {
+  level: Ordering
+  name: Ordering
+}
+
+"""
+Malawi administrative boundary reference table.
+
+Levels (provisional):
+    0 = Country
+    1 = Region
+    2 = District
+    3 = Traditional Authority
+    4 = Village Cluster / Zone
+
+The geometry column (GEOMETRY(MultiPolygon, 4326)) is added via RunSQL
+in the migration and is not mapped to a Django field — boundaries will
+be ingested separately once real HDX data is wired up.
+"""
+type AdminAreaType {
+  id: ID!
+  adminCode: Int!
+  name: String!
+  level: Int!
+  parentId: ID
+  countryIso: String!
+  createdAt: DateTime!
+}
+
+type AdminAreaTypeOffsetPaginated {
+  pageInfo: OffsetPaginationInfo!
+
+  """Total count of existing results."""
+  totalCount: Int!
+
+  """List of paginated results."""
+  results: [AdminAreaType!]!
+}
+
+type AppEnumCollection {
+  UserRole: [AppEnumCollectionUserRole!]!
+  IngestionStatus: [AppEnumCollectionIngestionStatus!]!
+  TriggerEventStatus: [AppEnumCollectionTriggerEventStatus!]!
+  HdxFileType: [AppEnumCollectionHdxFileType!]!
+  NotificationStatus: [AppEnumCollectionNotificationStatus!]!
+}
+
+type AppEnumCollectionHdxFileType {
+  key: String!
+  label: String!
+  value: String!
+}
+
+type AppEnumCollectionIngestionStatus {
+  key: String!
+  label: String!
+  value: String!
+}
+
+type AppEnumCollectionNotificationStatus {
+  key: String!
+  label: String!
+  value: String!
+}
+
+type AppEnumCollectionTriggerEventStatus {
+  key: String!
+  label: String!
+  value: String!
+}
+
+type AppEnumCollectionUserRole {
+  key: String!
+  label: String!
+  value: String!
+}
+
+"""
+ARC parametric rainfall observation, keyed by admin area.
+
+Column name cell_trigger is preserved from the JBA source CSV for
+traceability — do not rename.
+"""
+input ArcRainfallObservationFilter {
+  id: ID
+  adminAreaId: ID
+  cellTrigger: Boolean
+  observationDate: DateDateFilterLookup
+  AND: ArcRainfallObservationFilter
+  OR: ArcRainfallObservationFilter
+  NOT: ArcRainfallObservationFilter
+  DISTINCT: Boolean
+}
+
+input ArcRainfallObservationOrder @oneOf {
+  observationDate: Ordering
+  ingestedAt: Ordering
+}
+
+"""
+ARC parametric rainfall observation, keyed by admin area.
+
+Column name cell_trigger is preserved from the JBA source CSV for
+traceability — do not rename.
+"""
+type ArcRainfallObservationType {
+  id: ID!
+  observationDate: Date!
+  adminAreaId: ID!
+  adminArea: AdminAreaType!
+  rainfallRaw: Decimal
+  rainfall: Decimal
+  impact: Decimal
+  eventRp: Int
+  cellTrigger: Boolean!
+  sourceCsvBlobUrl: String
+  ingestedAt: DateTime!
+}
+
+type ArcRainfallObservationTypeOffsetPaginated {
+  pageInfo: OffsetPaginationInfo!
+
+  """Total count of existing results."""
+  totalCount: Int!
+
+  """List of paginated results."""
+  results: [ArcRainfallObservationType!]!
+}
+
+"""
+Workflow record created each time the ARC threshold trips.
+
+MRCS staff must confirm or reject before notifications go out.
+affected_admin_areas stores the integer PKs of AdminArea rows
+that crossed the threshold on trigger_date.
+"""
+input ArcTriggerEventFilter {
+  id: ID
+  status: String
+  triggerDate: DateDateFilterLookup
+  AND: ArcTriggerEventFilter
+  OR: ArcTriggerEventFilter
+  NOT: ArcTriggerEventFilter
+  DISTINCT: Boolean
+}
+
+input ArcTriggerEventOrder @oneOf {
+  triggerDate: Ordering
+  createdAt: Ordering
+}
+
+"""
+Workflow record created each time the ARC threshold trips.
+
+MRCS staff must confirm or reject before notifications go out.
+affected_admin_areas stores the integer PKs of AdminArea rows
+that crossed the threshold on trigger_date.
+"""
+type ArcTriggerEventType {
+  id: ID!
+  triggerDate: Date!
+  triggeredAdminAreasCount: Int!
+  affectedAdminAreas: [Int!]
+  status: String!
+  reviewedById: ID
+  reviewedBy: UserType
+  reviewedAt: DateTime
+  reviewNotes: String
+  emailSentAt: DateTime
+  createdAt: DateTime!
+}
+
+type ArcTriggerEventTypeOffsetPaginated {
+  pageInfo: OffsetPaginationInfo!
+
+  """Total count of existing results."""
+  totalCount: Int!
+
+  """List of paginated results."""
+  results: [ArcTriggerEventType!]!
+}
+
+"""Date (isoformat)"""
+scalar Date
+
+input DateDateFilterLookup {
+  """Exact match. Filter will be skipped on `null` value"""
+  exact: Date
+
+  """Assignment test. Filter will be skipped on `null` value"""
+  isNull: Boolean
+
+  """
+  Exact match of items in a given list. Filter will be skipped on `null` value
+  """
+  inList: [Date!]
+
+  """Greater than. Filter will be skipped on `null` value"""
+  gt: Date
+
+  """Greater than or equal to. Filter will be skipped on `null` value"""
+  gte: Date
+
+  """Less than. Filter will be skipped on `null` value"""
+  lt: Date
+
+  """Less than or equal to. Filter will be skipped on `null` value"""
+  lte: Date
+
+  """Inclusive range test (between)"""
+  range: DateRangeLookup
+  year: IntComparisonFilterLookup
+  month: IntComparisonFilterLookup
+  day: IntComparisonFilterLookup
+  weekDay: IntComparisonFilterLookup
+  isoWeekDay: IntComparisonFilterLookup
+  week: IntComparisonFilterLookup
+  isoYear: IntComparisonFilterLookup
+  quarter: IntComparisonFilterLookup
+}
+
+input DateRangeLookup {
+  start: Date = null
+  end: Date = null
+}
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+"""Decimal (fixed-point)"""
+scalar Decimal
+
+"""
+One TIFF + CSV pair downloaded from JBA, stored in Azure Blob.
+
+lead_time_days is NOT a column — derive it as:
+    forecast_target_date - forecast_issue_date
+"""
+input FloodForecastFileFilter {
+  id: ID
+  ingestionRunId: ID
+  forecastIssueDate: DateDateFilterLookup
+  forecastTargetDate: DateDateFilterLookup
+  AND: FloodForecastFileFilter
+  OR: FloodForecastFileFilter
+  NOT: FloodForecastFileFilter
+  DISTINCT: Boolean
+}
+
+input FloodForecastFileOrder @oneOf {
+  forecastIssueDate: Ordering
+  forecastTargetDate: Ordering
+  createdAt: Ordering
+}
+
+"""
+One TIFF + CSV pair downloaded from JBA, stored in Azure Blob.
+
+lead_time_days is NOT a column — derive it as:
+    forecast_target_date - forecast_issue_date
+"""
+type FloodForecastFileType {
+  id: ID!
+  ingestionRunId: ID
+  forecastIssueDate: Date!
+  forecastTargetDate: Date!
+  tiffBlobUrl: String!
+  csvBlobUrl: String!
+  originalFilename: String
+  fileSizeBytes: Int
+  createdAt: DateTime!
+
+  """Computed as forecast_target_date - forecast_issue_date."""
+  leadTimeDays: Int
+}
+
+type FloodForecastFileTypeOffsetPaginated {
+  pageInfo: OffsetPaginationInfo!
+
+  """Total count of existing results."""
+  totalCount: Int!
+
+  """List of paginated results."""
+  results: [FloodForecastFileType!]!
+}
+
+"""
+Ensemble-aggregated band_5 stats, one row per admin area per (issue, target) date pair.
+
+Raw 51-ensemble values are NOT retained — the source CSV in blob storage
+is the authoritative record.
+"""
+input FloodForecastImpactFilter {
+  id: ID
+  adminAreaId: ID
+  forecastIssueDate: DateDateFilterLookup
+  forecastTargetDate: DateDateFilterLookup
+  AND: FloodForecastImpactFilter
+  OR: FloodForecastImpactFilter
+  NOT: FloodForecastImpactFilter
+  DISTINCT: Boolean
+}
+
+input FloodForecastImpactOrder @oneOf {
+  forecastIssueDate: Ordering
+  forecastTargetDate: Ordering
+  createdAt: Ordering
+}
+
+"""
+Ensemble-aggregated band_5 stats, one row per admin area per (issue, target) date pair.
+
+Raw 51-ensemble values are NOT retained — the source CSV in blob storage
+is the authoritative record.
+"""
+type FloodForecastImpactType {
+  id: ID!
+  forecastFileId: ID
+  adminAreaId: ID!
+  adminArea: AdminAreaType!
+  forecastIssueDate: Date!
+  forecastTargetDate: Date!
+  band5Mean: Decimal
+  band5Median: Decimal
+  band5P75: Decimal
+  band5P90: Decimal
+  band5Max: Decimal
+  ensemblesNonzeroCount: Int
+  createdAt: DateTime!
+
+  """Computed as forecast_target_date - forecast_issue_date."""
+  leadTimeDays: Int
+}
+
+type FloodForecastImpactTypeOffsetPaginated {
+  pageInfo: OffsetPaginationInfo!
+
+  """Total count of existing results."""
+  totalCount: Int!
+
+  """List of paginated results."""
+  results: [FloodForecastImpactType!]!
+}
+
+"""
+Reference data manually loaded from HDX.
+
+Small structured data is stored inline in the data JSONB field;
+larger files are stored in Azure Blob and referenced by file_blob_url.
+"""
+input HdxDatasetFilter {
+  id: ID
+  fileType: String
+  AND: HdxDatasetFilter
+  OR: HdxDatasetFilter
+  NOT: HdxDatasetFilter
+  DISTINCT: Boolean
+  search: String
+}
+
+input HdxDatasetOrder @oneOf {
+  datasetName: Ordering
+  loadedAt: Ordering
+}
+
+"""
+Reference data manually loaded from HDX.
+
+Small structured data is stored inline in the data JSONB field;
+larger files are stored in Azure Blob and referenced by file_blob_url.
+"""
+type HdxDatasetType {
+  id: ID!
+  datasetName: String!
+  hdxUrl: String
+  description: String
+  fileType: String!
+  fileBlobUrl: String
+  data: JSON
+  loadedById: ID
+  loadedBy: UserType
+  loadedAt: DateTime!
+}
+
+type HdxDatasetTypeOffsetPaginated {
+  pageInfo: OffsetPaginationInfo!
+
+  """Total count of existing results."""
+  totalCount: Int!
+
+  """List of paginated results."""
+  results: [HdxDatasetType!]!
+}
+
+input IntComparisonFilterLookup {
+  """Exact match. Filter will be skipped on `null` value"""
+  exact: Int
+
+  """Assignment test. Filter will be skipped on `null` value"""
+  isNull: Boolean
+
+  """
+  Exact match of items in a given list. Filter will be skipped on `null` value
+  """
+  inList: [Int!]
+
+  """Greater than. Filter will be skipped on `null` value"""
+  gt: Int
+
+  """Greater than or equal to. Filter will be skipped on `null` value"""
+  gte: Int
+
+  """Less than. Filter will be skipped on `null` value"""
+  lt: Int
+
+  """Less than or equal to. Filter will be skipped on `null` value"""
+  lte: Int
+
+  """Inclusive range test (between)"""
+  range: IntRangeLookup
+}
+
+input IntRangeLookup {
+  start: Int = null
+  end: Int = null
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+"""Tracks each daily JBA fetch job."""
+input JbaIngestionRunFilter {
+  id: ID
+  status: String
+  runDate: DateDateFilterLookup
+  AND: JbaIngestionRunFilter
+  OR: JbaIngestionRunFilter
+  NOT: JbaIngestionRunFilter
+  DISTINCT: Boolean
+}
+
+input JbaIngestionRunOrder @oneOf {
+  runDate: Ordering
+  startedAt: Ordering
+}
+
+"""Tracks each daily JBA fetch job."""
+type JbaIngestionRunType {
+  id: ID!
+  runDate: Date!
+  forecastIssueTime: DateTime
+  status: String!
+  filesExpected: Int
+  filesProcessed: Int
+  errorLog: JSON
+  startedAt: DateTime!
+  completedAt: DateTime
+}
+
+type JbaIngestionRunTypeOffsetPaginated {
+  pageInfo: OffsetPaginationInfo!
+
+  """Total count of existing results."""
+  totalCount: Int!
+
+  """List of paginated results."""
+  results: [JbaIngestionRunType!]!
+}
+
+type OffsetPaginationInfo {
+  offset: Int!
+  limit: Int
+}
+
+input OffsetPaginationInput {
+  offset: Int! = 0
+  limit: Int
+}
+
+enum Ordering {
+  ASC
+  ASC_NULLS_FIRST
+  ASC_NULLS_LAST
+  DESC
+  DESC_NULLS_FIRST
+  DESC_NULLS_LAST
+}
+
+type Query {
+  users(pagination: OffsetPaginationInput): UserTypeOffsetPaginated!
+  user(id: ID!): UserType!
+  adminAreas(pagination: OffsetPaginationInput, filters: AdminAreaFilter, order: AdminAreaOrder): AdminAreaTypeOffsetPaginated!
+  adminArea(id: ID!): AdminAreaType!
+  jbaIngestionRuns(pagination: OffsetPaginationInput, filters: JbaIngestionRunFilter, order: JbaIngestionRunOrder): JbaIngestionRunTypeOffsetPaginated!
+  jbaIngestionRun(id: ID!): JbaIngestionRunType!
+  floodForecastFiles(pagination: OffsetPaginationInput, filters: FloodForecastFileFilter, order: FloodForecastFileOrder): FloodForecastFileTypeOffsetPaginated!
+  floodForecastFile(id: ID!): FloodForecastFileType!
+  floodForecastImpacts(pagination: OffsetPaginationInput, filters: FloodForecastImpactFilter, order: FloodForecastImpactOrder): FloodForecastImpactTypeOffsetPaginated!
+  arcRainfallObservations(pagination: OffsetPaginationInput, filters: ArcRainfallObservationFilter, order: ArcRainfallObservationOrder): ArcRainfallObservationTypeOffsetPaginated!
+  arcTriggerEvents(pagination: OffsetPaginationInput, filters: ArcTriggerEventFilter, order: ArcTriggerEventOrder): ArcTriggerEventTypeOffsetPaginated!
+  arcTriggerEvent(id: ID!): ArcTriggerEventType!
+  hdxDatasets(pagination: OffsetPaginationInput, filters: HdxDatasetFilter, order: HdxDatasetOrder): HdxDatasetTypeOffsetPaginated!
+  hdxDataset(id: ID!): HdxDatasetType!
+  enums: AppEnumCollection!
+}
+
+"""
+MRCS staff identity.
+
+Local Django auth for now; go_user_id will be populated when IFRC Go
+JWT integration is wired up. Password storage is intentional for the
+local-auth phase only — it will be removed once Go auth is live.
+"""
+type UserType {
+  id: ID!
+  email: String!
+  name: String
+  role: String!
+  isActive: Boolean!
+  createdAt: DateTime!
+}
+
+type UserTypeOffsetPaginated {
+  pageInfo: OffsetPaginationInfo!
+
+  """Total count of existing results."""
+  totalCount: Int!
+
+  """List of paginated results."""
+  results: [UserType!]!
+}
