@@ -7,7 +7,8 @@ from apps.admin_areas.models import AdminArea
 @strawberry_django.type(AdminArea)
 class AdminAreaType:
     id: strawberry.ID
-    admin_code: strawberry.auto
+    pcode: strawberry.auto
+    ifrc_id: strawberry.auto
     name: strawberry.auto
     level: strawberry.auto
     parent_id: strawberry.ID | None

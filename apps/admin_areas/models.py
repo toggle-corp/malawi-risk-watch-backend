@@ -7,19 +7,27 @@ from django_stubs_ext.db.models.manager import RelatedManager
 class AdminArea(models.Model):
     """Malawi administrative boundary reference table.
 
-    Levels (provisional):
+    Levels:
         0 = Country
         1 = Region
         2 = District
-        3 = Traditional Authority
-        4 = Village Cluster / Zone
+        3 = Traditional Authority  (sourced from HDX, not IFRC)
+        4 = Village Cluster / Zone (sourced from HDX, not IFRC)
 
-    The geometry column (GEOMETRY(MultiPolygon, 4326)) is added via RunSQL
-    in the migration and is not mapped to a Django field — boundaries will
-    be ingested separately once real HDX data is wired up.
+    External join keys:
+        pcode    — humanitarian P-code (e.g. MW, MW1, MW101); primary key
+                   used when joining against HDX, OCHA, and ARC datasets.
+        ifrc_id  — IFRC GO integer id; used as the upsert key during
+                   sync_geo. Null for levels 3–4 which come from HDX.
+
+    PostGIS column added via RunSQL in the initial migration (not mapped as a Django field):
+        geometry  — GEOMETRY(MultiPolygon, 4326)  full boundary polygon
+
+    bbox and centroid are stored as raw GeoJSON dicts (JSONField).
     """
 
-    admin_code = models.IntegerField(unique=True)
+    pcode = models.CharField(max_length=20, unique=True, db_index=True)
+    ifrc_id = models.IntegerField(unique=True, null=True, blank=True, db_index=True)
     name = models.TextField()
     level = models.IntegerField()
     parent = models.ForeignKey(
@@ -30,7 +38,10 @@ class AdminArea(models.Model):
         related_name="children",
     )
     country_iso = models.CharField(max_length=10, default="MWI")
+    bbox = models.JSONField(null=True, blank=True)
+    centroid = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     # reverse relation type hints
     children: typing.ClassVar[RelatedManager["AdminArea"]]
