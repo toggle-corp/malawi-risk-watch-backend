@@ -22,6 +22,8 @@ def send_arc_trigger_notifications(trigger_event_id: int) -> None:
 
     After all sends, update the event status to SENT or SEND_FAILED.
     """
+    logger.info("send_arc_trigger_notifications: starting for trigger_event_id=%s", trigger_event_id)
+
     try:
         event = ArcTriggerEvent.objects.select_related("reviewed_by").get(pk=trigger_event_id)
     except ArcTriggerEvent.DoesNotExist:
@@ -43,7 +45,7 @@ def send_arc_trigger_notifications(trigger_event_id: int) -> None:
         )
         return
 
-    reviewed_by_name = event.reviewed_by.get_full_name() or event.reviewed_by.email if event.reviewed_by else "MRCS Staff"
+    reviewed_by_name = (event.reviewed_by.name or event.reviewed_by.email) if event.reviewed_by else "MRCS Staff"
     reviewed_at_display = event.reviewed_at.strftime("%d %b %Y, %H:%M UTC") if event.reviewed_at else ""
 
     context = {

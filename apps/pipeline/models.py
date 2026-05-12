@@ -240,6 +240,16 @@ class ArcTriggerEvent(models.Model):
         verbose_name_plural = "ARC Trigger Events"
         ordering = ["-trigger_date"]
 
+    def get_admin_review_path(self) -> str:
+        """Relative URL to the admin review page for this event.
+
+        Prepend APP_DOMAIN at the call site to form an absolute URL for emails.
+        Example: f"{settings.APP_DOMAIN}{event.get_admin_review_path()}"
+        """
+        from django.urls import reverse
+
+        return reverse("admin:pipeline_arctriggerevent_review", args=[self.pk])
+
     @typing.override
     def __str__(self) -> str:
         return f"Trigger {self.trigger_date} [{self.status}]"

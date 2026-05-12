@@ -33,6 +33,22 @@ docker compose exec web python manage.py sync_geo
 docker compose exec web python manage.py sync_geo --dry-run
 ```
 
+## Dummy data
+
+Seeds users, JBA forecasts, ARC observations, trigger events, notification recipients, and logs for local development. Safe to re-run.
+
+```bash
+docker compose exec web python manage.py create_dummy_data
+```
+
+Created users (password `password123`):
+
+| Email | Role | Admin access |
+|---|---|---|
+| `admin@example.com` | Admin | Superuser |
+| `reviewer@example.com` | Reviewer | Staff |
+| `viewer@example.com` | Viewer | — |
+
 ## Running tests
 
 ```bash
