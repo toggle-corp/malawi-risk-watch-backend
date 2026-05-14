@@ -1,0 +1,179 @@
+[project]
+name = "malawi-backend"
+version = "0.1.0"
+description = "MRCS Disaster Risk Management Backend"
+requires-python = ">=3.12"
+dependencies = [
+    "Django>=5.1",
+    "psycopg2-binary>=2.9",
+    "django-environ>=0.11",
+    "djangorestframework>=3.15",
+    "django-cors-headers>=4.3",
+    "django-storages[s3]>=1.14",
+    "strawberry-graphql-django~=0.70.1",
+    "django-choices-field",
+    "django-health-check~=3.0",
+    "asgiref>=3.8",
+    "gunicorn>=23.0",
+    "uvicorn>=0.34",
+    "django-stubs-ext>=5.0",
+    "celery[redis]>=5.3",
+    "redis>=5.0",
+    "requests>=2.32",
+]
+
+[dependency-groups]
+dev = [
+    "pytest-django>=4.9",
+    "pytest-cov>=6.0",
+    "django-debug-toolbar>=4.3",
+    "django-stubs>=5.0",
+    "ipython>=8.0",
+    "factory-boy>=3.3",
+    "pre-commit",
+    "pyright",
+    "ruff",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "main.settings"
+log_cli = true
+
+[tool.ruff]
+line-length = 125
+extend-exclude = [
+    ".git",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "**/migrations/*",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+flake8-builtins.builtins-strict-checking = false
+ignore = [
+    "D100",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
+    "D205",
+    "D401",
+    "G201",
+    "PLC0415",
+    "A002",
+    "S608",
+    "DJ001",
+    "C901",
+    "BLE001",
+]
+extend-select = [
+    "I",
+    "E",
+    "F",
+    "B",
+    "A",
+    "W",
+    "DJ",
+    "COM",
+    "ISC",
+    "ICN",
+    "LOG",
+    "G",
+    "T20",
+    "TID",
+    "PT",
+    "Q",
+    "RET",
+    "SIM",
+    "TC",
+    "PTH",
+    "UP",
+    "D",
+    "ASYNC",
+    "S",
+    "BLE",
+    "FA",
+    "INP",
+    "PIE",
+    "RSE",
+    "SLOT",
+    "FLY",
+    "C90",
+    "PGH",
+    "PLC",
+    "PLE",
+    "PLW",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+"**/tests/*.py" = ["S101"]
+"!./apps/**/models.py" = ["D101"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+exclude = [
+    "**/__pycache__",
+    ".venv/",
+    "**/migrations/*.py",
+]
+typeCheckingMode = "standard"
+analyzeUnannotatedFunctions = true
+enableReachabilityAnalysis = true
+strictDictionaryInference = true
+strictListInference = true
+strictSetInference = true
+reportCallInDefaultInitializer = "information"
+reportConstantRedefinition = "error"
+reportDeprecated = "information"
+reportDuplicateImport = "warning"
+reportImplicitOverride = "error"
+reportImplicitStringConcatenation = "none"
+reportImportCycles = "none"
+reportInconsistentConstructor = "warning"
+reportMatchNotExhaustive = "warning"
+reportMissingImports = "error"
+reportMissingParameterType = "warning"
+reportMissingTypeArgument = "warning"
+reportMissingTypeStubs = "warning"
+reportPrivateUsage = "error"
+reportPropertyTypeMismatch = "error"
+reportShadowedImports = "error"
+reportUninitializedInstanceVariable = "warning"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUnnecessaryCast = "warning"
+reportUnnecessaryComparison = "warning"
+reportUnnecessaryContains = "warning"
+reportUnnecessaryIsInstance = "warning"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportUntypedBaseClass = "warning"
+reportUntypedClassDecorator = "warning"
+reportUntypedFunctionDecorator = "warning"
+reportUntypedNamedTuple = "warning"
+reportUnusedClass = "warning"
+reportUnusedExpression = "warning"
+reportUnusedFunction = "warning"
+reportUnusedImport = "warning"
+reportUnusedVariable = "warning"
+reportPrivateImportUsage = "error"
+
+[tool.mypy]
+plugins = ["mypy_django_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "main.settings"

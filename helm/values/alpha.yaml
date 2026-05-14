@@ -1,0 +1,36 @@
+app:
+  environment: ALPHA
+
+  # Alpha uses in-cluster postgres with PostGIS enabled
+  postgresql:
+    enabled: true
+    fullnameOverride: "malawi-postgresql"
+    architecture: standalone
+    image:
+      registry: docker.io
+      repository: postgis/postgis
+      tag: 15-3.3
+    auth:
+      postgresPassword: ""
+      username: ""
+      password: ""
+      database: "malawi"
+    primary:
+      persistence:
+        enabled: true
+        storageClass: ""
+        size: 5Gi
+
+  env:
+    AWS_S3_ENABLED: "false"
+
+  secrets:
+    POSTGRES_DB: "{{ $.Values.postgresql.auth.database }}"
+    POSTGRES_USER: "postgres"
+    POSTGRES_PASSWORD: "{{ $.Values.postgresql.auth.postgresPassword }}"
+    POSTGRES_HOST: "{{ include \"postgresql.v1.primary.fullname\" $.Subcharts.postgresql }}"
+    POSTGRES_PORT: "{{ include \"postgresql.v1.service.port\" $.Subcharts.postgresql }}"
+    AWS_S3_ENDPOINT_URL: ""
+    AWS_S3_ACCESS_KEY_ID: ""
+    AWS_S3_SECRET_ACCESS_KEY: ""
+    AWS_S3_REGION_NAME: "eastus"

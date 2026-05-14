@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  web:
+    image: $DOCKER_IMAGE_BACKEND
+    stdin_open: true
+    tty: true
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    build:
+      context: ./
+    environment:
+      CI: "true"
+      DEBUG: "true"
+      APP_ENVIRONMENT: CI
+      APP_TYPE: WEB
+      DJANGO_SECRET_KEY: "random-secret-key-for-ci"
+      APP_DOMAIN: http://localhost:8000
+      FRONTEND_DOMAIN: http://localhost:3000
+      SESSION_COOKIE_DOMAIN: localhost
+      CSRF_COOKIE_DOMAIN: localhost
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      TIME_ZONE: UTC
+    volumes:
+      - ./ci-share/:/ci-share/
+    depends_on:
+      - db
+
+volumes:
+  postgres-data:

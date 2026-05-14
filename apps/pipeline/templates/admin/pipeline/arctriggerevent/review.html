@@ -1,0 +1,150 @@
+{% extends "admin/base_site.html" %}
+{% block nav-sidebar %}{% endblock %}
+{% load i18n admin_urls %}
+
+{% block title %}{{ title }} | {{ site_title|default:"Django site admin" }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Home" %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; {% trans "Review" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+
+  <h2>{% trans "Event Details" %}</h2>
+  <table class="form-table">
+    <tbody>
+      <tr>
+        <th>{% trans "Trigger Date" %}</th>
+        <td>{{ event.trigger_date }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "Affected Admin Areas" %}</th>
+        <td>{{ event.triggered_admin_areas_count }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "Status" %}</th>
+        <td>{{ event.get_status_display }}</td>
+      </tr>
+      {% if not is_actionable %}
+      <tr>
+        <th>{% trans "Reviewed By" %}</th>
+        <td>{{ event.reviewed_by|default:"—" }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "Reviewed At" %}</th>
+        <td>{{ event.reviewed_at|default:"—" }}</td>
+      </tr>
+      <tr>
+        <th>{% trans "Review Notes" %}</th>
+        <td>{{ event.review_notes|default:"—" }}</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <h2>{% trans "Triggered Observations" %} ({{ observations|length }})</h2>
+  {% if observations %}
+  <table class="results">
+    <thead>
+      <tr>
+        <th>{% trans "Admin Area" %}</th>
+        <th>{% trans "Rainfall (mm)" %}</th>
+        <th>{% trans "Rainfall Raw (mm)" %}</th>
+        <th>{% trans "Impact" %}</th>
+        <th>{% trans "Return Period" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for obs in observations %}
+      <tr class="{% cycle 'row1' 'row2' %}">
+        <td>{{ obs.admin_area.name }}</td>
+        <td>{{ obs.rainfall|default:"—" }}</td>
+        <td>{{ obs.rainfall_raw|default:"—" }}</td>
+        <td>{{ obs.impact|default:"—" }}</td>
+        <td>{{ obs.event_rp|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="help">{% trans "No observations found for the affected areas on this date." %}</p>
+  {% endif %}
+
+  <h2>{% trans "Notification Recipients" %} ({{ recipients|length }})</h2>
+  {% if recipients %}
+  <table class="results">
+    <thead>
+      <tr>
+        <th>{% trans "Name" %}</th>
+        <th>{% trans "Email" %}</th>
+        <th>{% trans "Organization" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in recipients %}
+      <tr class="{% cycle 'row1' 'row2' %}">
+        <td>{{ r.name|default:"—" }}</td>
+        <td>{{ r.email }}</td>
+        <td>{{ r.organization|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="help">{% trans "No active recipients match the affected admin areas." %}</p>
+  {% endif %}
+
+  {% if is_actionable %}
+  <h2>{% trans "Decision" %}</h2>
+  <p class="help">
+    {% blocktrans with count=recipients|length %}
+      Confirming will immediately queue notification emails to {{ count }} recipient(s) listed above.
+      Rejecting will discard the event without sending any emails.
+    {% endblocktrans %}
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <fieldset class="module">
+      <div class="form-row">
+        <label>{% trans "Action" %}</label>
+        <div>
+          <label>
+            <input type="radio" name="action" value="confirm" required>
+            {% trans "Confirm — send notifications to the recipients above" %}
+          </label><br>
+          <label>
+            <input type="radio" name="action" value="reject">
+            {% trans "Reject — discard event, no emails sent" %}
+          </label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label for="id_review_notes">{% trans "Review Notes" %}</label>
+          <p class="help">{% trans "Optional. Included in the outgoing notification email when confirming." %}</p>
+          <textarea id="id_review_notes" name="review_notes" rows="4" style="width:100%;max-width:600px"></textarea>
+        </div>
+      </div>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="{% trans 'Submit Decision' %}" class="default">
+      <a href="{% url opts|admin_urlname:'changelist' %}" class="deletelink">{% trans "Cancel" %}</a>
+    </div>
+  </form>
+  {% else %}
+  <p class="help">
+    {% trans "This event has already been reviewed and cannot be actioned again." %}
+  </p>
+  <div class="submit-row">
+    <a href="{% url opts|admin_urlname:'changelist' %}">{% trans "Back to list" %}</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

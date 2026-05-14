@@ -1,0 +1,18 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  _:
+    uses: toggle-corp/banjo-action/.github/workflows/pipeline.yml@v0.1.0
+    with:
+      # Job: Docker
+      docker__wait_cmd: "./manage.py wait_for_resources --db"
+      docker__migration_dummy_test: "main.tests.FakeTest"
+      docker__run_graphql_check: true
+      docker__compose_file: "gh-docker-compose.yml"
+      docker__compose_service_name: "web"
+      docker__compose_test_cmd: "/code/misc/run_tests.sh"
+      # Job: Helm
+      helm__chart_directory: "./helm"
