@@ -37,7 +37,7 @@ class Query:
     )
     jba_ingestion_run: JbaIngestionRunType = strawberry_django.field()
 
-    # -- Flood forecast files (includes tiff_blob_url + csv_blob_url)
+    # -- Flood forecast files (one TIFF per lead time; CSV URL is on the run)
     flood_forecast_files: OffsetPaginated[FloodForecastFileType] = strawberry_django.offset_paginated(
         filters=FloodForecastFileFilter,
         order=FloodForecastFileOrder,

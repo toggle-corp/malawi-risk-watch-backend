@@ -27,6 +27,8 @@ class JbaIngestionRunType:
     status: strawberry.auto
     files_expected: strawberry.auto
     files_processed: strawberry.auto
+    # Single CSV covering all lead times for this run
+    csv_blob_url: strawberry.auto
     error_log: strawberry.auto
     started_at: strawberry.auto
     completed_at: strawberry.auto
@@ -38,9 +40,7 @@ class FloodForecastFileType:
     ingestion_run_id: strawberry.ID | None
     forecast_issue_date: strawberry.auto
     forecast_target_date: strawberry.auto
-    # Raw data URLs
     tiff_blob_url: strawberry.auto
-    csv_blob_url: strawberry.auto
     original_filename: strawberry.auto
     file_size_bytes: strawberry.auto
     created_at: strawberry.auto

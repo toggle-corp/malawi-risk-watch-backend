@@ -55,6 +55,7 @@ class JbaIngestionRun(models.Model):
     )
     files_expected = models.IntegerField(null=True, blank=True)
     files_processed = models.IntegerField(null=True, blank=True)
+    csv_blob_url = models.TextField(null=True, blank=True)
     error_log = models.JSONField(null=True, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -73,7 +74,10 @@ class JbaIngestionRun(models.Model):
 
 
 class FloodForecastFile(models.Model):
-    """One TIFF + CSV pair downloaded from JBA, stored in Azure Blob.
+    """One TIFF file downloaded from JBA, stored in Azure Blob.
+
+    JBA delivers 10 TIFFs per day (one per lead time) plus a single CSV for the
+    whole run — the CSV URL lives on JbaIngestionRun, not here.
 
     lead_time_days is NOT a column — derive it as:
         forecast_target_date - forecast_issue_date
@@ -89,7 +93,6 @@ class FloodForecastFile(models.Model):
     forecast_issue_date = models.DateField()
     forecast_target_date = models.DateField()
     tiff_blob_url = models.TextField()
-    csv_blob_url = models.TextField()
     original_filename = models.TextField(null=True, blank=True)
     file_size_bytes = models.BigIntegerField(null=True, blank=True)
     # bounds (GEOMETRY(Polygon, 4326)) — added via RunSQL in migration, not mapped here

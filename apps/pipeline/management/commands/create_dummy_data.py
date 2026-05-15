@@ -129,26 +129,29 @@ class Command(BaseCommand):
             dict(
                 run_date=today - timedelta(days=7),
                 status=IngestionStatus.SUCCESS,
-                files_expected=5,
-                files_processed=5,
+                files_expected=10,
+                files_processed=10,
             ),
             dict(
                 run_date=today - timedelta(days=1),
                 status=IngestionStatus.SUCCESS,
-                files_expected=5,
-                files_processed=5,
+                files_expected=10,
+                files_processed=10,
             ),
         ]
 
         for spec in runs_spec:
+            issue_date = spec["run_date"]
             run, created = JbaIngestionRun.objects.get_or_create(
-                run_date=spec["run_date"],
+                run_date=issue_date,
                 defaults={
-                    "forecast_issue_time": timezone.now() - timedelta(days=(today - spec["run_date"]).days),
+                    "forecast_issue_time": timezone.now() - timedelta(days=(today - issue_date).days),
                     "status": spec["status"],
                     "files_expected": spec["files_expected"],
                     "files_processed": spec["files_processed"],
-                    "completed_at": timezone.now() - timedelta(days=(today - spec["run_date"]).days),
+                    # One CSV covers all lead times for the run
+                    "csv_blob_url": f"https://blob.example.com/jba/{issue_date}/impacts.csv",
+                    "completed_at": timezone.now() - timedelta(days=(today - issue_date).days),
                 },
             )
             action = "Created" if created else "Skipped"
@@ -156,9 +159,8 @@ class Command(BaseCommand):
             if not created:
                 continue
 
-            # Create forecast files for lead times 1–5
-            for lead_days in range(1, 6):
-                issue_date = spec["run_date"]
+            # Create one TIFF per lead time (1–10 days)
+            for lead_days in range(1, 11):
                 target_date = issue_date + timedelta(days=lead_days)
                 ff, _ = FloodForecastFile.objects.get_or_create(
                     forecast_issue_date=issue_date,
@@ -166,8 +168,7 @@ class Command(BaseCommand):
                     defaults={
                         "ingestion_run": run,
                         "tiff_blob_url": f"https://blob.example.com/jba/{issue_date}/lead{lead_days}.tiff",
-                        "csv_blob_url": f"https://blob.example.com/jba/{issue_date}/lead{lead_days}.csv",
-                        "original_filename": f"MW_{issue_date}_L{lead_days}.zip",
+                        "original_filename": f"MW_{issue_date}_L{lead_days:02d}.tiff",
                         "file_size_bytes": random.randint(500_000, 5_000_000),
                     },
                 )
