@@ -35,6 +35,19 @@ docker compose exec web python manage.py sync_geo
 docker compose exec web python manage.py sync_geo --dry-run
 ```
 
+### `load_hdx_data` — Load HDX risk assessment datasets
+
+Fetches 6 HDX CSV datasets (demographics, vulnerability, flood exposure, etc.) from HEIGiT public storage and stores them in the database. Safe to re-run — existing records are updated in place.
+
+```bash
+docker compose exec web python manage.py load_hdx_data
+
+# Specify which user to set as loaded_by
+docker compose exec web python manage.py load_hdx_data --user admin@example.com
+```
+
+Requires a superuser to exist (or pass `--user`). Run `sync_geo` first so admin area boundaries are in place.
+
 ## Dummy data
 
 Seeds users, JBA forecasts, ARC observations, trigger events, notification recipients, and logs for local development. Safe to re-run.

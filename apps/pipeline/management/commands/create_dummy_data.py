@@ -12,10 +12,11 @@ Safe to re-run: existing objects are skipped or updated via get_or_create / upda
 """
 
 import random
+import typing
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import Any
 
-from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -30,8 +31,7 @@ from apps.pipeline.models import (
     JbaIngestionRun,
     TriggerEventStatus,
 )
-
-User = get_user_model()
+from apps.users.models import User
 
 # ---------------------------------------------------------------------------
 # Admin area ID constants (PKs already in the database after sync_geo)
@@ -80,7 +80,8 @@ ARC_RAINFALL_SAMPLES = [
 class Command(BaseCommand):
     help = "Seed realistic dummy data for local development."
 
-    def handle(self, *args, **options) -> None:
+    @typing.override
+    def handle(self, *args: Any, **options: Any) -> None:
         random.seed(42)
 
         self._create_users()
@@ -141,7 +142,7 @@ class Command(BaseCommand):
         ]
 
         for spec in runs_spec:
-            issue_date = spec["run_date"]
+            issue_date = typing.cast("date", spec["run_date"])
             run, created = JbaIngestionRun.objects.get_or_create(
                 run_date=issue_date,
                 defaults={
@@ -169,13 +170,13 @@ class Command(BaseCommand):
                         "ingestion_run": run,
                         "tiff_blob_url": f"https://blob.example.com/jba/{issue_date}/lead{lead_days}.tiff",
                         "original_filename": f"MW_{issue_date}_L{lead_days:02d}.tiff",
-                        "file_size_bytes": random.randint(500_000, 5_000_000),
+                        "file_size_bytes": random.randint(500_000, 5_000_000),  # noqa: S311
                     },
                 )
 
                 # Create per-district impacts
                 for district_id in DISTRICT_IDS:
-                    sample = random.choice(BAND5_SAMPLES)
+                    sample = random.choice(BAND5_SAMPLES)  # noqa: S311
                     FloodForecastImpact.objects.get_or_create(
                         forecast_issue_date=issue_date,
                         forecast_target_date=target_date,
@@ -187,7 +188,7 @@ class Command(BaseCommand):
                             "band_5_p75": sample[2],
                             "band_5_p90": sample[3],
                             "band_5_max": sample[4],
-                            "ensembles_nonzero_count": random.randint(0, 51),
+                            "ensembles_nonzero_count": random.randint(0, 51),  # noqa: S311
                         },
                     )
 
@@ -203,7 +204,7 @@ class Command(BaseCommand):
 
         for obs_date in obs_dates:
             for district_id in DISTRICT_IDS:
-                rainfall = random.choice(ARC_RAINFALL_SAMPLES)
+                rainfall = random.choice(ARC_RAINFALL_SAMPLES)  # noqa: S311
                 cell_trigger = rainfall >= Decimal("25.400")
                 ArcRainfallObservation.objects.get_or_create(
                     observation_date=obs_date,
@@ -212,7 +213,7 @@ class Command(BaseCommand):
                         "rainfall_raw": rainfall * Decimal("1.05"),
                         "rainfall": rainfall,
                         "impact": rainfall * Decimal("0.42") if rainfall > 0 else Decimal("0"),
-                        "event_rp": random.choice([None, 2, 5, 10, 20]) if cell_trigger else None,
+                        "event_rp": random.choice([None, 2, 5, 10, 20]) if cell_trigger else None,  # noqa: S311
                         "cell_trigger": cell_trigger,
                         "source_csv_blob_url": f"https://blob.example.com/arc/{obs_date}.csv",
                     },
