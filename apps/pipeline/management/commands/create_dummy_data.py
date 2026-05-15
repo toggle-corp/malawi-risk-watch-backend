@@ -12,7 +12,6 @@ Safe to re-run: existing objects are skipped or updated via get_or_create / upda
 """
 
 import random
-import typing
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -81,7 +80,6 @@ ARC_RAINFALL_SAMPLES = [
 class Command(BaseCommand):
     help = "Seed realistic dummy data for local development."
 
-    @typing.override
     def handle(self, *args, **options) -> None:
         random.seed(42)
 
@@ -117,9 +115,9 @@ class Command(BaseCommand):
             if created:
                 obj.set_password("password123")
                 obj.save(update_fields=["password"])
-                self.stdout.write(f"  Created user: {obj.pk}")
+                self.stdout.write(f"  Created user: {obj.email}")
             else:
-                self.stdout.write(f"  Skipped user: {obj.pk} (already exists)")
+                self.stdout.write(f"  Skipped user: {obj.email} (already exists)")
 
     # ------------------------------------------------------------------
     # JBA ingestion data
@@ -131,27 +129,29 @@ class Command(BaseCommand):
             dict(
                 run_date=today - timedelta(days=7),
                 status=IngestionStatus.SUCCESS,
-                files_expected=5,
-                files_processed=5,
+                files_expected=10,
+                files_processed=10,
             ),
             dict(
                 run_date=today - timedelta(days=1),
                 status=IngestionStatus.SUCCESS,
-                files_expected=5,
-                files_processed=5,
+                files_expected=10,
+                files_processed=10,
             ),
         ]
 
         for spec in runs_spec:
-            run_date = typing.cast("date", spec["run_date"])
+            issue_date = spec["run_date"]
             run, created = JbaIngestionRun.objects.get_or_create(
-                run_date=run_date,
+                run_date=issue_date,
                 defaults={
-                    "forecast_issue_time": timezone.now() - timedelta(days=(today - run_date).days),
+                    "forecast_issue_time": timezone.now() - timedelta(days=(today - issue_date).days),
                     "status": spec["status"],
                     "files_expected": spec["files_expected"],
                     "files_processed": spec["files_processed"],
-                    "completed_at": timezone.now() - timedelta(days=(today - run_date).days),
+                    # One CSV covers all lead times for the run
+                    "csv_blob_url": f"https://blob.example.com/jba/{issue_date}/impacts.csv",
+                    "completed_at": timezone.now() - timedelta(days=(today - issue_date).days),
                 },
             )
             action = "Created" if created else "Skipped"
@@ -159,9 +159,8 @@ class Command(BaseCommand):
             if not created:
                 continue
 
-            # Create forecast files for lead times 1–5
-            for lead_days in range(1, 6):
-                issue_date = run_date
+            # Create one TIFF per lead time (1–10 days)
+            for lead_days in range(1, 11):
                 target_date = issue_date + timedelta(days=lead_days)
                 ff, _ = FloodForecastFile.objects.get_or_create(
                     forecast_issue_date=issue_date,
@@ -169,15 +168,14 @@ class Command(BaseCommand):
                     defaults={
                         "ingestion_run": run,
                         "tiff_blob_url": f"https://blob.example.com/jba/{issue_date}/lead{lead_days}.tiff",
-                        "csv_blob_url": f"https://blob.example.com/jba/{issue_date}/lead{lead_days}.csv",
-                        "original_filename": f"MW_{issue_date}_L{lead_days}.zip",
-                        "file_size_bytes": random.randint(500_000, 5_000_000),  # noqa: S311
+                        "original_filename": f"MW_{issue_date}_L{lead_days:02d}.tiff",
+                        "file_size_bytes": random.randint(500_000, 5_000_000),
                     },
                 )
 
                 # Create per-district impacts
                 for district_id in DISTRICT_IDS:
-                    sample = random.choice(BAND5_SAMPLES)  # noqa: S311
+                    sample = random.choice(BAND5_SAMPLES)
                     FloodForecastImpact.objects.get_or_create(
                         forecast_issue_date=issue_date,
                         forecast_target_date=target_date,
@@ -189,7 +187,7 @@ class Command(BaseCommand):
                             "band_5_p75": sample[2],
                             "band_5_p90": sample[3],
                             "band_5_max": sample[4],
-                            "ensembles_nonzero_count": random.randint(0, 51),  # noqa: S311
+                            "ensembles_nonzero_count": random.randint(0, 51),
                         },
                     )
 
@@ -205,7 +203,7 @@ class Command(BaseCommand):
 
         for obs_date in obs_dates:
             for district_id in DISTRICT_IDS:
-                rainfall = random.choice(ARC_RAINFALL_SAMPLES)  # noqa: S311
+                rainfall = random.choice(ARC_RAINFALL_SAMPLES)
                 cell_trigger = rainfall >= Decimal("25.400")
                 ArcRainfallObservation.objects.get_or_create(
                     observation_date=obs_date,
@@ -214,7 +212,7 @@ class Command(BaseCommand):
                         "rainfall_raw": rainfall * Decimal("1.05"),
                         "rainfall": rainfall,
                         "impact": rainfall * Decimal("0.42") if rainfall > 0 else Decimal("0"),
-                        "event_rp": random.choice([None, 2, 5, 10, 20]) if cell_trigger else None,  # noqa: S311
+                        "event_rp": random.choice([None, 2, 5, 10, 20]) if cell_trigger else None,
                         "cell_trigger": cell_trigger,
                         "source_csv_blob_url": f"https://blob.example.com/arc/{obs_date}.csv",
                     },

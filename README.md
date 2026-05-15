@@ -1,6 +1,8 @@
 # Malawi Risk Watch — Backend
 
-Django backend for the Malawi Red Cross Society (MRCS) Disaster Risk Management pipeline. Ingests JBA flood forecasts and ARC parametric rainfall data, and feeds outputs into the IFRC Go platform.
+Django backend for the Malawi Red Cross Society (MRCS) Disaster Risk Management pipeline. Ingests JBA flood forecasts and ARC parametric rainfall data, processes them against Malawi administrative boundaries, and drives an email notification workflow for MRCS staff.
+
+See [`docs/data-pipeline.md`](docs/data-pipeline.md) for a full description of how JBA and ARC data is ingested, transformed, and stored — and how it drives the trigger event and notification workflow.
 
 ## Requirements
 
