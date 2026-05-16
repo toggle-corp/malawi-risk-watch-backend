@@ -1,8 +1,7 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash -e
 
-# Run the Celery worker for local development.
-# Requires Redis to be running (e.g. via docker-compose up redis).
-# Usage: bash misc/dev/run_worker.sh
+REDIS_HOST_PORT=$(echo $CELERY_REDIS_URL | sed 's|redis://\([^/]*\)/.*|\1|')
 
-exec uv run celery -A main worker --loglevel=info
+./manage.py wait_for_resources --db --celery-queue
+
+./manage.py run_celery_dev

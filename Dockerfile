@@ -17,9 +17,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     apt-get update -y \
     && apt-get install -y --no-install-recommends \
+        # Build required packages
+        gdal-bin build-essential gcc libc-dev libgdal-dev libproj-dev \
+        libmagic1 \
+        # Helper packages
         procps \
     && uv lock --locked --offline \
         && uv sync --frozen --no-install-project --all-groups \
+     # Clean-up
+    && apt-get remove -y build-essential gcc libc-dev libgdal-dev libproj-dev \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
