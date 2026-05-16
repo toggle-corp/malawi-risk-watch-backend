@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
+from djangoql.admin import DjangoQLSearchMixin
 
 from apps.notifications.models import NotificationRecipient
 from apps.pipeline.serializers import ReviewTriggerEventSerializer
@@ -20,26 +21,26 @@ from .models import (
 
 
 @admin.register(JbaIngestionRun)
-class JbaIngestionRunAdmin(admin.ModelAdmin):
+class JbaIngestionRunAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     list_display = ["run_date", "status", "files_expected", "files_processed", "started_at"]
     list_filter = ["status"]
     ordering = ["-run_date"]
 
 
 @admin.register(FloodForecastFile)
-class FloodForecastFileAdmin(admin.ModelAdmin):
+class FloodForecastFileAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     list_display = ["forecast_issue_date", "forecast_target_date", "ingestion_run", "created_at"]
     ordering = ["-forecast_issue_date"]
 
 
 @admin.register(FloodForecastImpact)
-class FloodForecastImpactAdmin(admin.ModelAdmin):
+class FloodForecastImpactAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     list_display = ["forecast_issue_date", "forecast_target_date", "admin_area", "band_5_mean"]
     ordering = ["-forecast_issue_date"]
 
 
 @admin.register(ArcRainfallObservation)
-class ArcRainfallObservationAdmin(admin.ModelAdmin):
+class ArcRainfallObservationAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     list_display = ["observation_date", "admin_area", "rainfall", "cell_trigger", "ingested_at"]
     list_filter = ["cell_trigger"]
     ordering = ["-observation_date"]
@@ -62,7 +63,7 @@ class ArcTriggerEventAdmin(admin.ModelAdmin):
             )
         return "—"
 
-    def get_urls(self) -> list:
+    def get_urls(self) -> list:  # type: ignore[reportAttributeAccessIssue] NOTE: we need to fix this later @AdityaKhatri
         urls = super().get_urls()
         custom = [
             path(
@@ -88,7 +89,9 @@ class ArcTriggerEventAdmin(admin.ModelAdmin):
             ArcRainfallObservation.objects.filter(
                 observation_date=event.trigger_date,
                 admin_area_id__in=affected,
-            ).select_related("admin_area").order_by("admin_area__name")
+            )
+            .select_related("admin_area")
+            .order_by("admin_area__name")
             if affected
             else ArcRainfallObservation.objects.none()
         )
@@ -111,7 +114,7 @@ class ArcTriggerEventAdmin(admin.ModelAdmin):
             )
             if serializer.is_valid():
                 serializer.save()
-                action_label = "confirmed" if serializer.validated_data["action"] == "confirm" else "rejected"
+                action_label = "confirmed" if serializer.validated_data["action"] == "confirm" else "rejected"  # type: ignore[reportAttributeAccessIssue]
                 self.message_user(request, f"Trigger event {event.trigger_date} has been {action_label}.")
                 return HttpResponseRedirect(changelist_url)
 
@@ -132,7 +135,7 @@ class ArcTriggerEventAdmin(admin.ModelAdmin):
 
 
 @admin.register(HdxDataset)
-class HdxDatasetAdmin(admin.ModelAdmin):
+class HdxDatasetAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     list_display = ["dataset_name", "file_type", "loaded_by", "loaded_at"]
     list_filter = ["file_type"]
     ordering = ["-loaded_at"]

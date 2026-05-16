@@ -5,9 +5,14 @@ from urllib.parse import urljoin
 
 import requests
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandParser
 from django.db import connections
 from django.db.utils import OperationalError
+from redis.exceptions import ConnectionError as RedisConnectionError
+
+
+class TimeoutException(Exception): ...
 
 
 def timeout_handler(*_):
@@ -28,24 +33,37 @@ class Command(BaseCommand):
                 break
             except OperationalError:
                 ...
+            # Try again
             self.stdout.write(self.style.WARNING("DB not available, waiting..."))
             time.sleep(1)
 
         self.stdout.write(self.style.SUCCESS(f"DB is available after {time.time() - start_time} seconds"))
 
-    def wait_for_s3(self):
-        """Wait for the S3-compatible blob storage endpoint to be reachable.
+    def wait_for_redis(self):
+        self.stdout.write("Waiting for Redis...")
+        redis_conn = None
+        start_time = time.time()
+        while True:
+            try:
+                cache.set("wait-for-it-ping", "pong", timeout=1)  # Set a key to check Redis availability
+                redis_conn = cache.get("wait-for-it-ping")  # Try to get the value back from Redis
+                if redis_conn != "pong":
+                    raise TypeError
+                break
+            except (RedisConnectionError, TypeError):
+                ...
+            # Try again
+            self.stdout.write(self.style.WARNING("Redis not available, waiting..."))
+            time.sleep(1)
 
-        Uses AWS_S3_CONFIG_OPTIONS.endpoint_url — set when AWS_S3_ENABLED=true.
-        Polls the root of the endpoint; any HTTP response (including 403) means the
-        service is up. Only used in environments where storage runs in-cluster
-        (e.g. local MinIO in the alpha/dev helm environment).
-        """
-        self.stdout.write("Waiting for S3 storage...")
-        aws_config = getattr(settings, "AWS_S3_CONFIG_OPTIONS", None) or {}
-        endpoint_url = aws_config.get("endpoint_url")
+        self.stdout.write(self.style.SUCCESS(f"Redis is available after {time.time() - start_time} seconds"))
+
+    def wait_for_minio(self):
+        self.stdout.write("Waiting for Minio...")
+        AWS_S3_CONFIG_OPTIONS = getattr(settings, "AWS_S3_CONFIG_OPTIONS", None) or {}
+        endpoint_url = AWS_S3_CONFIG_OPTIONS.get("endpoint_url")
         if endpoint_url is None:
-            self.stdout.write(self.style.WARNING("No S3 endpoint_url configured. Skipping."))
+            self.stdout.write(self.style.WARNING("No endpoint_url is provided. Skipping wait"))
             return
 
         start_time = time.time()
@@ -56,35 +74,48 @@ class Command(BaseCommand):
                     break
             except requests.exceptions.RequestException:
                 ...
-            self.stdout.write(self.style.WARNING("S3 storage not available, waiting..."))
+            # Try again
+            self.stdout.write(self.style.WARNING("Minio not available, waiting..."))
             time.sleep(5)
 
-        self.stdout.write(self.style.SUCCESS(f"S3 storage is available after {time.time() - start_time} seconds"))
+        self.stdout.write(self.style.SUCCESS(f"Minio is available after {time.time() - start_time} seconds"))
 
     @typing.override
     def add_arguments(self, parser: CommandParser):
         parser.add_argument(
             "--timeout",
+            "--timeout",
             type=int,
             default=600,
-            help="Max seconds to wait before giving up (default: 600).",
+            help="The maximum time (in seconds) the command is allowed to run before timing out. Default is 10 min.",
         )
         parser.add_argument("--db", action="store_true", help="Wait for DB to be available")
-        parser.add_argument("--s3", action="store_true", help="Wait for S3-compatible storage to be available")
-        parser.add_argument("--all", action="store_true", help="Wait for all resources")
+        parser.add_argument("--celery-queue", action="store_true", help="Wait for Celery queue to be available")
+        parser.add_argument("--redis", action="store_true", help="Wait for Redis to be available")
+        parser.add_argument("--minio", action="store_true", help="Wait for MinIO (S3) storage to be available")
+        parser.add_argument("--firebase", action="store_true", help="Wait for Firebase to be available")
+        parser.add_argument("--all", action="store_true", help="Wait for all to be available")
 
     @typing.override
     def handle(self, **kwargs: typing.Any):
         timeout = kwargs["timeout"]
         _all = kwargs["all"]
 
+        # Set the timeout handler (1 minute = 60 seconds)
         signal.signal(signal.SIGALRM, timeout_handler)
         signal.alarm(timeout)
 
         try:
             if _all or kwargs["db"]:
                 self.wait_for_db()
-            if _all or kwargs["s3"]:
-                self.wait_for_s3()
+            if _all or kwargs["minio"]:
+                self.wait_for_minio()
+            if _all or kwargs["redis"]:
+                self.wait_for_redis()
+            if _all or kwargs["celery_queue"]:
+                self.wait_for_redis()
+        except TimeoutException:
+            ...
         finally:
+            # Disable the alarm (cleanup)
             signal.alarm(0)

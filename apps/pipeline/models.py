@@ -240,6 +240,10 @@ class ArcTriggerEvent(models.Model):
         verbose_name_plural = "ARC Trigger Events"
         ordering = ["-trigger_date"]
 
+    @typing.override
+    def __str__(self) -> str:
+        return f"Trigger {self.trigger_date} [{self.status}]"
+
     def get_admin_review_path(self) -> str:
         """Relative URL to the admin review page for this event.
 
@@ -249,10 +253,6 @@ class ArcTriggerEvent(models.Model):
         from django.urls import reverse
 
         return reverse("admin:pipeline_arctriggerevent_review", args=[self.pk])
-
-    @typing.override
-    def __str__(self) -> str:
-        return f"Trigger {self.trigger_date} [{self.status}]"
 
 
 # ---------------------------------------------------------------------------
