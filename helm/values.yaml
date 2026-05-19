@@ -14,14 +14,61 @@ app:
 
   redis:
     enabled: false
+    architecture: standalone
+    fullnameOverride: mrcs-redis
+    auth:
+      enabled: false
+    master:
+      persistence:
+        enabled: true
+        size: .5Gi
+        storageClass:
 
-  # PostgreSQL is managed externally (Azure Database for PostgreSQL Flexible Server).
-  # Connection details are injected as secrets — no in-cluster postgres.
+
   postgresql:
     enabled: false
+    fullnameOverride: "mrcs-postgresql"
+    architecture: standalone
+    auth:
+      postgresPassword: ""
+      username: ""
+      password: ""
+      database: "mrcs"
+    primary:
+      persistence:
+        enabled: "true"
+        storageClass: ""
+        size: 1Gi
 
   minio:
     enabled: false
+    disableWebUI: true
+    mode: standalone
+    fullnameOverride: mrcs-minio
+    global:
+      defaultStorageClass:
+    apiIngress:
+      enabled: true
+      ingressClassName:
+      hostname:
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    auth:
+      forceNewKeys: true
+      rootUser: mrcs
+      rootPassword:
+    persistence:
+      enabled: true
+      size: 1Gi
+    defaultBuckets: mrcs-static,mrcs-media
+    provisioning:
+      enabled: true
+      resourcesPreset: "nano"
+      cleanupAfterFinished:
+        enabled: true
+      extraCommands:
+        - "mc anonymous set download provisioning/mrcs-static"
+        - "mc anonymous set download provisioning/mrcs-media"
 
   api:
     enabled: true
@@ -38,6 +85,8 @@ app:
 
   worker:
     enabled: false
+    beat:
+      enabled: false
 
   argoHook:
     enabled: true
@@ -57,33 +106,23 @@ app:
       collect-static:
         enabled: true
         hook: PostSync
-        command: ["/bin/bash", "-c", "./manage.py collectstatic --noinput"]
+        command: ["/bin/bash", "-c", "./manage.py wait_for_resources --minio && ./manage.py collectstatic --noinput"]
+
 
   env:
     APP_RELEASE: "{{ $.Values.image.tag }}"
     APP_ENVIRONMENT: "{{ $.Values.environment }}"
     DJANGO_DEBUG: "false"
+    # AWS
+    AWS_S3_ENABLED: "false"
+    # App Domain
     APP_TYPE: "WEB"
-    # Azure Blob Storage (S3-compatible)
-    AWS_S3_ENABLED: "true"
-    AWS_S3_MEDIA_BUCKET_NAME: "mrcs-media"
-    AWS_S3_STATIC_BUCKET_NAME: "mrcs-static"
-    # Domains — must be overridden per environment
     APP_DOMAIN: "{{ required \".app.env.APP_DOMAIN\" nil }}"
     FRONTEND_DOMAIN: "{{ required \".app.env.FRONTEND_DOMAIN\" nil }}"
     SESSION_COOKIE_DOMAIN: "{{ required \".app.env.SESSION_COOKIE_DOMAIN\" nil }}"
     CSRF_COOKIE_DOMAIN: "{{ required \".app.env.CSRF_COOKIE_DOMAIN\" nil }}"
+    # Sentry
+    SENTRY_ENABLED: "false"
 
   secrets:
     DJANGO_SECRET_KEY: "{{ required \".Values.secrets.DJANGO_SECRET_KEY\" nil }}"
-    # Azure Database for PostgreSQL Flexible Server
-    POSTGRES_DB: "{{ required \".Values.secrets.POSTGRES_DB\" nil }}"
-    POSTGRES_USER: "{{ required \".Values.secrets.POSTGRES_USER\" nil }}"
-    POSTGRES_PASSWORD: "{{ required \".Values.secrets.POSTGRES_PASSWORD\" nil }}"
-    POSTGRES_HOST: "{{ required \".Values.secrets.POSTGRES_HOST\" nil }}"
-    POSTGRES_PORT: "5432"
-    # Azure Blob Storage credentials
-    AWS_S3_ENDPOINT_URL: "{{ required \".Values.secrets.AWS_S3_ENDPOINT_URL\" nil }}"
-    AWS_S3_ACCESS_KEY_ID: "{{ required \".Values.secrets.AWS_S3_ACCESS_KEY_ID\" nil }}"
-    AWS_S3_SECRET_ACCESS_KEY: "{{ required \".Values.secrets.AWS_S3_SECRET_ACCESS_KEY\" nil }}"
-    AWS_S3_REGION_NAME: "{{ required \".Values.secrets.AWS_S3_REGION_NAME\" nil }}"

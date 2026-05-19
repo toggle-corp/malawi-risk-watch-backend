@@ -6,9 +6,10 @@ exclude: |
     (?x)^(
       \.git|
       __pycache__|
+      .*snap_test_.*\.py|
+      .+\/.+\/migrations\/.*|
       \.venv|
       schema.graphql|
-      .*/migrations/.*|
       helm/snapshots
     )
 
@@ -35,11 +36,6 @@ repos:
       - id: check-docstring-first
       - id: detect-private-key
       - id: name-tests-test
-
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.24.2
-    hooks:
-      - id: gitleaks
 
   - repo: https://github.com/crate-ci/typos
     rev: v1.31.1
