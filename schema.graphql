@@ -273,7 +273,10 @@ scalar DateTime
 scalar Decimal
 
 """
-One TIFF + CSV pair downloaded from JBA, stored in Azure Blob.
+One TIFF file downloaded from JBA, stored in Azure Blob.
+
+JBA delivers 10 TIFFs per day (one per lead time) plus a single CSV for the
+whole run — the CSV URL lives on JbaIngestionRun, not here.
 
 lead_time_days is NOT a column — derive it as:
     forecast_target_date - forecast_issue_date
@@ -296,7 +299,10 @@ input FloodForecastFileOrder @oneOf {
 }
 
 """
-One TIFF + CSV pair downloaded from JBA, stored in Azure Blob.
+One TIFF file downloaded from JBA, stored in Azure Blob.
+
+JBA delivers 10 TIFFs per day (one per lead time) plus a single CSV for the
+whole run — the CSV URL lives on JbaIngestionRun, not here.
 
 lead_time_days is NOT a column — derive it as:
     forecast_target_date - forecast_issue_date
@@ -307,7 +313,6 @@ type FloodForecastFileType {
   forecastIssueDate: Date!
   forecastTargetDate: Date!
   tiffBlobUrl: String!
-  csvBlobUrl: String!
   originalFilename: String
   fileSizeBytes: Int
   createdAt: DateTime!
@@ -496,6 +501,7 @@ type JbaIngestionRunType {
   status: String!
   filesExpected: Int
   filesProcessed: Int
+  csvBlobUrl: String
   errorLog: JSON
   startedAt: DateTime!
   completedAt: DateTime

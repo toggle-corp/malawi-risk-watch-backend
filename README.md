@@ -4,6 +4,8 @@ Django backend for the Malawi Red Cross Society (MRCS) Disaster Risk Management 
 
 See [`docs/data-pipeline.md`](docs/data-pipeline.md) for a full description of how JBA and ARC data is ingested, transformed, and stored — and how it drives the trigger event and notification workflow.
 
+See [`docs/ifrc-go-queries.md`](docs/ifrc-go-queries.md) for the GraphQL queries the IFRC Go platform should use to fetch map layers (HDX, JBA flood risk, ARC events) and admin area boundaries.
+
 ## Requirements
 
 - Docker & Docker Compose
