@@ -28,6 +28,7 @@ that country. The command will raise a clear error if an IFRC id appears that
 isn't in the mapping — use that to catch any gaps before production runs.
 """
 
+import typing
 from collections.abc import Iterator
 from typing import Any
 
@@ -65,6 +66,7 @@ HTTP_TIMEOUT = 30.0
 class Command(BaseCommand):
     help = "Sync Malawi administrative areas (levels 0–2) from IFRC GO."
 
+    @typing.override
     def add_arguments(self, parser: Any) -> None:
         parser.add_argument(
             "--dry-run",
@@ -72,6 +74,7 @@ class Command(BaseCommand):
             help="Fetch data and log what would happen, but roll back all DB writes.",
         )
 
+    @typing.override
     def handle(self, *args: Any, **options: Any) -> None:
         dry_run: bool = options["dry_run"]
         if dry_run:
@@ -148,8 +151,8 @@ class GeoSyncer:
                 self.stdout.write(
                     self.style.WARNING(
                         f"  Skipping unmapped admin1 ifrc_id={ifrc_id} "
-                        f"(name={record.get('name')!r}) — add to ADMIN1_PCODE_BY_IFRC_ID to include it."
-                    )
+                        f"(name={record.get('name')!r}) — add to ADMIN1_PCODE_BY_IFRC_ID to include it.",
+                    ),
                 )
                 continue
 
@@ -179,9 +182,7 @@ class GeoSyncer:
     def sync_admin2s(self) -> list[AdminArea]:
         url = f"{GO_DOMAIN}/api/v2/admin2/?admin1__country={COUNTRY_IFRC_ID}"
         admin1_by_ifrc_id = {
-            a.ifrc_id: a
-            for a in AdminArea.objects.filter(level=1, country_iso=COUNTRY_ISO3)
-            if a.ifrc_id is not None
+            a.ifrc_id: a for a in AdminArea.objects.filter(level=1, country_iso=COUNTRY_ISO3) if a.ifrc_id is not None
         }
         areas: list[AdminArea] = []
 
@@ -195,7 +196,7 @@ class GeoSyncer:
                 raise ValueError(
                     f"Admin2 {pcode!r} (ifrc_id={ifrc_id}) references unknown "
                     f"parent district_id={parent_ifrc_id}. Run sync_geo again after "
-                    "admin1 sync is complete, or check ADMIN1_PCODE_BY_IFRC_ID."
+                    "admin1 sync is complete, or check ADMIN1_PCODE_BY_IFRC_ID.",
                 )
 
             area, created = AdminArea.objects.update_or_create(
@@ -258,6 +259,6 @@ class GeoSyncer:
         for level, counts in self._counts.items():
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"  Level {level}: {counts['created']} created, {counts['updated']} updated"
-                )
+                    f"  Level {level}: {counts['created']} created, {counts['updated']} updated",
+                ),
             )

@@ -1,36 +1,48 @@
+#TODO(@sudip-khanal): update this file after alpha deployment.
 app:
   environment: ALPHA
 
   ingress:
     enabled: true
     className: nginx
-    host: test.malawi.example.com
+    host: test.mrcs.com
     annotations:
       nginx.ingress.kubernetes.io/proxy-body-size: "20m"
 
+  redis:
+    enabled: true
+    architecture: standalone
+    fullnameOverride: mrcs-redis
+    auth:
+      enabled: false
+
   postgresql:
     enabled: true
-    fullnameOverride: "malawi-postgresql"
+    fullnameOverride: "mrcs-postgresql"
     architecture: standalone
     auth:
       postgresPassword: "test-password"
-      database: "malawi"
+
+
+  minio:
+    enabled: true
+    tls:
+      enabled: false
+    apiIngress:
+      hostname: mrcs-minio.test.com
+    auth:
+      rootPassword: test-password
 
   env:
-    APP_DOMAIN: https://malawi.test.example.com
-    FRONTEND_DOMAIN: https://malawi-frontend.test.example.com
+    APP_DOMAIN: https://mrcs.test.com
+    APP_RELEASE:  https://mrcs.test.com
+    FRONTEND_DOMAIN: https://mrcs-frontend.test.com
     SESSION_COOKIE_DOMAIN: .example.com
     CSRF_COOKIE_DOMAIN: .example.com
+    # AWS
     AWS_S3_ENABLED: "false"
+    # Sentry
+    SENTRY_ENABLED: "true"
 
   secrets:
-    DJANGO_SECRET_KEY: "django-secret-key-for-tests"
-    POSTGRES_DB: "malawi"
-    POSTGRES_USER: "postgres"
-    POSTGRES_PASSWORD: "test-password"
-    POSTGRES_HOST: "malawi-postgresql"
-    POSTGRES_PORT: "5432"
-    AWS_S3_ENDPOINT_URL: ""
-    AWS_S3_ACCESS_KEY_ID: ""
-    AWS_S3_SECRET_ACCESS_KEY: ""
-    AWS_S3_REGION_NAME: "eastus"
+    DJANGO_SECRET_KEY: "django-secret-key"

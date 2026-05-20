@@ -1,36 +1,36 @@
 app:
-  environment: ALPHA
+  environment: PROD
 
-  # Alpha uses in-cluster postgres with PostGIS enabled
+  redis:
+    enabled: true
+
   postgresql:
     enabled: true
-    fullnameOverride: "malawi-postgresql"
-    architecture: standalone
-    image:
-      registry: docker.io
-      repository: postgis/postgis
-      tag: 15-3.3
-    auth:
-      postgresPassword: ""
-      username: ""
-      password: ""
-      database: "malawi"
-    primary:
-      persistence:
-        enabled: true
-        storageClass: ""
-        size: 5Gi
+
+  minio:
+    enabled: true
+
+  worker:
+    enabled: true
 
   env:
-    AWS_S3_ENABLED: "false"
+    # AWS
+    AWS_S3_ENABLED: "true"
+    AWS_S3_ENDPOINT_URL: "https://{{ $.Values.minio.apiIngress.hostname }}/"
+    AWS_S3_MEDIA_BUCKET_NAME: "mrcs-media"
+    AWS_S3_STATIC_BUCKET_NAME: "mrcs-static"
 
   secrets:
+    # Postgres
     POSTGRES_DB: "{{ $.Values.postgresql.auth.database }}"
     POSTGRES_USER: "postgres"
     POSTGRES_PASSWORD: "{{ $.Values.postgresql.auth.postgresPassword }}"
     POSTGRES_HOST: "{{ include \"postgresql.v1.primary.fullname\" $.Subcharts.postgresql }}"
     POSTGRES_PORT: "{{ include \"postgresql.v1.service.port\" $.Subcharts.postgresql }}"
-    AWS_S3_ENDPOINT_URL: ""
-    AWS_S3_ACCESS_KEY_ID: ""
-    AWS_S3_SECRET_ACCESS_KEY: ""
-    AWS_S3_REGION_NAME: "eastus"
+     # Redis
+    CELERY_REDIS_URL: "redis://{{ printf \"%s-master\" (include \"common.names.fullname\" $.Subcharts.redis) }}:6379/0"
+    CACHE_REDIS_URL: "redis://{{ printf \"%s-master\" (include \"common.names.fullname\" $.Subcharts.redis) }}:6379/1"
+    # Minio (S3)
+    AWS_S3_ACCESS_KEY_ID: "{{ required \".app.minio.auth.rootUser\" $.Values.minio.auth.rootUser }}"
+    AWS_S3_SECRET_ACCESS_KEY: "{{ required \".app.minio.auth.rootPassword\" $.Values.minio.auth.rootPassword }}"
+    AWS_S3_REGION_NAME: "us-east-1"
