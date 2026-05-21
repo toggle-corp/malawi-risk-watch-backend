@@ -20,6 +20,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         # Build required packages
         gdal-bin build-essential gcc libc-dev libgdal-dev libproj-dev \
         libmagic1 \
+        # Required for dependencies installed from Git URLs
+        git \
         # Helper packages
         procps \
     && uv lock --locked --offline \

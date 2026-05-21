@@ -154,6 +154,7 @@ INSTALLED_APPS = [
     "djangoql",
     "rest_framework",
     "drf_spectacular",
+    "banjo_utils",
     # - Health-check
     "health_check",  # required
     # Internal

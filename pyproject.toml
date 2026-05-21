@@ -18,14 +18,18 @@ dependencies = [
     "uvicorn>=0.34",
     "django-stubs-ext>=5.0",
     "celery[redis]>=5.3",
-    "redis>=5.0",
     "requests>=2.32",
     "sentry-sdk>=2.60.0",
     "djangoql>=0.19.1",
     "drf-spectacular>=0.29.0",
     "colorlog>=6.10.1",
-    "django-redis>=6.0.0",
+    "django-redis>=5.4.0",
+    "banjo-utils",
+
 ]
+
+[tool.uv.sources]
+banjo-utils = { git = "https://github.com/toggle-corp/banjo-utils", tag = "v0.1.0" }
 
 [dependency-groups]
 dev = [
