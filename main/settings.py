@@ -526,6 +526,9 @@ if DEBUG:
 # Django toolbar
 ENABLE_DEBUG_TOOLBAR = env("ENABLE_DEBUG_TOOLBAR")
 
+if DEBUG:
+    MIDDLEWARE.insert(0, "utils.middleware.RangeRequestMiddleware")
+
 if ENABLE_DEBUG_TOOLBAR and not IS_TESTING:
     INSTALLED_APPS.append("debug_toolbar")
     MIDDLEWARE.append("strawberry_django.middlewares.debug_toolbar.DebugToolbarMiddleware")

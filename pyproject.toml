@@ -25,6 +25,7 @@ dependencies = [
     "drf-spectacular>=0.29.0",
     "colorlog>=6.10.1",
     "django-redis>=6.0.0",
+    "rio-cogeo>=7.0.2",
 ]
 
 [dependency-groups]

@@ -15,12 +15,16 @@ import random
 import typing
 from datetime import date, timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.notifications.models import NotificationLog, NotificationRecipient
+from apps.pipeline.cog import convert_to_cog_bytes
 from apps.pipeline.models import (
     ArcRainfallObservation,
     ArcTriggerEvent,
@@ -32,6 +36,8 @@ from apps.pipeline.models import (
     TriggerEventStatus,
 )
 from apps.users.models import User
+
+DUMMY_TIFF = Path(__file__).resolve().parents[4] / "dummy" / "dummy.tif"
 
 # ---------------------------------------------------------------------------
 # Admin area ID constants (PKs already in the database after sync_geo)
@@ -124,8 +130,16 @@ class Command(BaseCommand):
     # JBA ingestion data
     # ------------------------------------------------------------------
 
+    def _get_dummy_cog_path(self, storage_key: str) -> str:
+        """Convert dummy.tif to COG and save to storage, returning the storage path."""
+        if default_storage.exists(storage_key):
+            return storage_key
+        cog_bytes = convert_to_cog_bytes(DUMMY_TIFF)
+        return default_storage.save(storage_key, ContentFile(cog_bytes))
+
     def _create_jba_data(self) -> None:
         today = date.today()
+        self.stdout.write("  Converting dummy TIFF to COG …")
         runs_spec = [
             dict(
                 run_date=today - timedelta(days=7),
@@ -151,7 +165,7 @@ class Command(BaseCommand):
                     "files_expected": spec["files_expected"],
                     "files_processed": spec["files_processed"],
                     # One CSV covers all lead times for the run
-                    "csv_blob_url": f"https://blob.example.com/jba/{issue_date}/impacts.csv",
+                    "csv": f"jba/csv/{issue_date}/impacts.csv",
                     "completed_at": timezone.now() - timedelta(days=(today - issue_date).days),
                 },
             )
@@ -160,16 +174,18 @@ class Command(BaseCommand):
             if not created:
                 continue
 
-            # Create one TIFF per lead time (1–10 days)
+            # Create one COG TIFF per lead time (1–10 days)
             for lead_days in range(1, 11):
                 target_date = issue_date + timedelta(days=lead_days)
+                storage_key = f"jba/tiff/{issue_date}/lead{lead_days:02d}.tif"
+                cog_path = self._get_dummy_cog_path(storage_key)
                 ff, _ = FloodForecastFile.objects.get_or_create(
                     forecast_issue_date=issue_date,
                     forecast_target_date=target_date,
                     defaults={
                         "ingestion_run": run,
-                        "tiff_blob_url": f"https://blob.example.com/jba/{issue_date}/lead{lead_days}.tiff",
-                        "original_filename": f"MW_{issue_date}_L{lead_days:02d}.tiff",
+                        "tiff": cog_path,
+                        "original_filename": f"MW_{issue_date}_L{lead_days:02d}.tif",
                         "file_size_bytes": random.randint(500_000, 5_000_000),  # noqa: S311
                     },
                 )
@@ -215,7 +231,7 @@ class Command(BaseCommand):
                         "impact": rainfall * Decimal("0.42") if rainfall > 0 else Decimal("0"),
                         "event_rp": random.choice([None, 2, 5, 10, 20]) if cell_trigger else None,  # noqa: S311
                         "cell_trigger": cell_trigger,
-                        "source_csv_blob_url": f"https://blob.example.com/arc/{obs_date}.csv",
+                        "source_csv": f"arc/csv/{obs_date}.csv",
                     },
                 )
 

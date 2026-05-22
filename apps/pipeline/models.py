@@ -55,7 +55,7 @@ class JbaIngestionRun(models.Model):
     )
     files_expected = models.IntegerField(null=True, blank=True)
     files_processed = models.IntegerField(null=True, blank=True)
-    csv_blob_url = models.TextField(null=True, blank=True)
+    csv = models.FileField(upload_to="jba/csv/", null=True, blank=True)
     error_log = models.JSONField(null=True, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -92,7 +92,7 @@ class FloodForecastFile(models.Model):
     )
     forecast_issue_date = models.DateField()
     forecast_target_date = models.DateField()
-    tiff_blob_url = models.TextField()
+    tiff = models.FileField(upload_to="jba/tiff/")
     original_filename = models.TextField(null=True, blank=True)
     file_size_bytes = models.BigIntegerField(null=True, blank=True)
     # bounds (GEOMETRY(Polygon, 4326)) — added via RunSQL in migration, not mapped here
@@ -186,7 +186,7 @@ class ArcRainfallObservation(models.Model):
     impact = models.DecimalField(max_digits=20, decimal_places=8, null=True, blank=True)
     event_rp = models.IntegerField(null=True, blank=True)
     cell_trigger = models.BooleanField()
-    source_csv_blob_url = models.TextField(null=True, blank=True)
+    source_csv = models.FileField(upload_to="arc/csv/", null=True, blank=True)
     ingested_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -276,7 +276,7 @@ class HdxDataset(models.Model):
     hdx_url = models.TextField(null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     file_type = models.CharField(max_length=10, choices=HdxFileType.choices)
-    file_blob_url = models.TextField(null=True, blank=True)
+    file = models.FileField(upload_to="hdx/", null=True, blank=True)
     data = models.JSONField(null=True, blank=True)
     loaded_by = models.ForeignKey(
         "users.User",

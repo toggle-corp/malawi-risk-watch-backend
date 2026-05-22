@@ -107,7 +107,6 @@ class Command(BaseCommand):
                 if default_storage.exists(storage_path):
                     default_storage.delete(storage_path)
                 saved_path = default_storage.save(storage_path, ContentFile(raw))
-                file_url = default_storage.url(saved_path)
             except Exception as exc:
                 self.stdout.write(self.style.ERROR(f"    Failed to save to storage: {exc}"))
                 continue
@@ -118,13 +117,13 @@ class Command(BaseCommand):
                     "hdx_url": spec["url"],
                     "description": spec["description"],
                     "file_type": "csv",
-                    "file_blob_url": file_url,
+                    "file": saved_path,
                     "data": None,
                     "loaded_by": user,
                 },
             )
             action = "Created" if created else "Updated"
-            self.stdout.write(self.style.SUCCESS(f"    {action}: {obj.dataset_name} → {file_url}"))
+            self.stdout.write(self.style.SUCCESS(f"    {action}: {obj.dataset_name} → {saved_path}"))
 
     def _resolve_user(self, email: str | None):
         if email:
