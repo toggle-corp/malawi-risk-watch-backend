@@ -20,6 +20,11 @@ dependencies = [
     "celery[redis]>=5.3",
     "redis>=5.0",
     "requests>=2.32",
+    "sentry-sdk>=2.60.0",
+    "djangoql>=0.19.1",
+    "drf-spectacular>=0.29.0",
+    "colorlog>=6.10.1",
+    "django-redis>=6.0.0",
 ]
 
 [dependency-groups]
@@ -47,7 +52,8 @@ line-length = 125
 extend-exclude = [
     ".git",
     ".pytest_cache",
-    ".mypy_cache",
+    ".mypy_cache",    "colorlog>=6.10.1",
+
     ".ruff_cache",
     ".venv",
     "venv",
@@ -74,6 +80,7 @@ ignore = [
     "DJ001",
     "C901",
     "BLE001",
+    "S101",
 ]
 extend-select = [
     "I",

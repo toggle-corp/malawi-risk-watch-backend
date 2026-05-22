@@ -1,10 +1,19 @@
 #!/bin/bash -x
 
+
+CODE_DIR=${CODE_DIR:-/code}
+
 ./manage.py wait_for_resources --db
 
 if [ "$CI" == "true" ]; then
+    pip3 install pytest-cov
+
     set -e
 
+    # To show migration logs
+    ./manage.py test --keepdb -v 2 main.tests.fake_test
+
+    # Run all tests now
     py.test \
         --cov-config=.coveragerc \
         --cov \
@@ -12,8 +21,8 @@ if [ "$CI" == "true" ]; then
         --cov-report=xml \
         --junitxml=junit.xml \
         -o junit_family=legacy \
+        --reuse-db \
         --durations=10
-
     coverage report -i
 
     set +e

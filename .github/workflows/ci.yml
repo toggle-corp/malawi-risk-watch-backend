@@ -9,7 +9,7 @@ jobs:
     with:
       # Job: Docker
       docker__wait_cmd: "./manage.py wait_for_resources --db"
-      docker__migration_dummy_test: "main.tests.FakeTest"
+      docker__migration_dummy_test: "main.tests.fake_test.FakeTest"
       docker__run_graphql_check: true
       docker__compose_file: "gh-docker-compose.yml"
       docker__compose_service_name: "web"

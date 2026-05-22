@@ -23,12 +23,15 @@ x-server: &base_server_setup
     # Redis / Celery
     CELERY_REDIS_URL: ${CELERY_REDIS_URL:-redis://redis:6379/0}
     CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
+    TEST_CACHE_REDIS_URL: ${TEST_CACHE_REDIS_URL:-redis://redis:6379/11}
     # Email
-    EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
-    DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-mrcs-drm@example.com}
-    EMAIL_API_URL: ${EMAIL_API_URL:-}
-    EMAIL_API_KEY: ${EMAIL_API_KEY:-}
-    EMAIL_API_TIMEOUT: ${EMAIL_API_TIMEOUT:-30}
+    EMAIL_HOST: ${EMAIL_HOST:-mailpit}
+    EMAIL_PORT: ${EMAIL_PORT:-1025}
+    EMAIL_HOST_USER: ${EMAIL_HOST_USER:-mailpit}
+    EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-mailpit}
+    DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-dev-mrcs@gmail.com}
+
+
   env_file:
     - path: ${BACKEND_ENV_FILE:-.env}
       required: false
@@ -43,7 +46,7 @@ x-server: &base_server_setup
 
 services:
   db:
-    image: postgis/postgis:15-3.3
+    image: postgis/postgis:17-3.5
     environment:
       POSTGRES_DB: malawi
       POSTGRES_USER: postgres
@@ -52,9 +55,23 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     volumes:
       - redis_data:/data
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: mailpit
+    restart: unless-stopped
+    volumes:
+      - mailpit_data:/data
+    ports:
+        - 8025:8025
+    environment:
+        MP_MAX_MESSAGES: 5000
+        MP_DATABASE: /data/mailpit.db
+        MP_SMTP_AUTH_ACCEPT_ANY: 1
+        MP_SMTP_AUTH_ALLOW_INSECURE: 1
 
   web:
     <<: *base_server_setup
@@ -76,3 +93,4 @@ volumes:
   postgres_data:
   redis_data:
   ipython_data_local:
+  mailpit_data:
