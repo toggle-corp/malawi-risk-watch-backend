@@ -155,7 +155,7 @@ type ArcRainfallObservationType {
   impact: Decimal
   eventRp: Int
   cellTrigger: Boolean!
-  sourceCsvBlobUrl: String
+  sourceCsv: DjangoFileType
   ingestedAt: DateTime!
 }
 
@@ -272,8 +272,18 @@ scalar DateTime
 """Decimal (fixed-point)"""
 scalar Decimal
 
+type DjangoFileType {
+  name: String!
+  path: String!
+  size: Int!
+  url: String!
+}
+
 """
-One TIFF + CSV pair downloaded from JBA, stored in Azure Blob.
+One TIFF file downloaded from JBA, stored in Azure Blob.
+
+JBA delivers 10 TIFFs per day (one per lead time) plus a single CSV for the
+whole run — the CSV URL lives on JbaIngestionRun, not here.
 
 lead_time_days is NOT a column — derive it as:
     forecast_target_date - forecast_issue_date
@@ -296,7 +306,10 @@ input FloodForecastFileOrder @oneOf {
 }
 
 """
-One TIFF + CSV pair downloaded from JBA, stored in Azure Blob.
+One TIFF file downloaded from JBA, stored in Azure Blob.
+
+JBA delivers 10 TIFFs per day (one per lead time) plus a single CSV for the
+whole run — the CSV URL lives on JbaIngestionRun, not here.
 
 lead_time_days is NOT a column — derive it as:
     forecast_target_date - forecast_issue_date
@@ -306,8 +319,7 @@ type FloodForecastFileType {
   ingestionRunId: ID
   forecastIssueDate: Date!
   forecastTargetDate: Date!
-  tiffBlobUrl: String!
-  csvBlobUrl: String!
+  tiff: DjangoFileType!
   originalFilename: String
   fileSizeBytes: Int
   createdAt: DateTime!
@@ -417,7 +429,7 @@ type HdxDatasetType {
   hdxUrl: String
   description: String
   fileType: String!
-  fileBlobUrl: String
+  file: DjangoFileType
   data: JSON
   loadedById: ID
   loadedBy: UserType
@@ -496,6 +508,7 @@ type JbaIngestionRunType {
   status: String!
   filesExpected: Int
   filesProcessed: Int
+  csv: DjangoFileType
   errorLog: JSON
   startedAt: DateTime!
   completedAt: DateTime

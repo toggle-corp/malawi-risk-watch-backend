@@ -1,3 +1,5 @@
+import typing
+
 from django.contrib import admin, messages
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -63,7 +65,8 @@ class ArcTriggerEventAdmin(admin.ModelAdmin):
             )
         return "—"
 
-    def get_urls(self) -> list:  # type: ignore[reportAttributeAccessIssue] NOTE: we need to fix this later @AdityaKhatri
+    @typing.override
+    def get_urls(self) -> list:
         urls = super().get_urls()
         custom = [
             path(

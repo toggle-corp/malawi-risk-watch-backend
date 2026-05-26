@@ -83,12 +83,11 @@ env = environ.Env(
     # Test
     ENABLE_DANGER_MODE=(bool, False),
     # Email
-    # Custom Api
+    EMAIL_BACKEND=(str, "django.core.mail.backends.console.EmailBackend"),
+    DEFAULT_FROM_EMAIL=(str, "mrcs-drm@example.com"),
     EMAIL_API_URL=(str, None),
     EMAIL_API_KEY=(str, None),
-    EMAIL_BACKEND=(str, None),
     EMAIL_API_TIMEOUT=(int, None),
-    DEFAULT_FROM_EMAIL=(str, None),
     # Dev smtp
     EMAIL_HOST=(str, None),
     EMAIL_PORT=(str, None),
@@ -526,6 +525,9 @@ if DEBUG:
 
 # Django toolbar
 ENABLE_DEBUG_TOOLBAR = env("ENABLE_DEBUG_TOOLBAR")
+
+if DEBUG:
+    MIDDLEWARE.insert(0, "utils.middleware.RangeRequestMiddleware")
 
 if ENABLE_DEBUG_TOOLBAR and not IS_TESTING:
     INSTALLED_APPS.append("debug_toolbar")

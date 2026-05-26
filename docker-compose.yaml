@@ -9,7 +9,7 @@ x-server: &base_server_setup
     APP_TYPE: ${APP_TYPE:-WEB}
     DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?error}
     # Domain configs
-    APP_DOMAIN: ${APP_DOMAIN:-http://localhost:8000}
+    APP_DOMAIN: ${APP_DOMAIN:-http://localhost:8060}
     FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:-http://localhost:3000}
     SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-localhost}
     CSRF_COOKIE_DOMAIN: ${CSRF_COOKIE_DOMAIN:-localhost}
@@ -80,7 +80,7 @@ services:
       <<: *base_server_environments
       APP_TYPE: "WEB"
     ports:
-      - 127.0.0.1:8000:8000
+      - 127.0.0.1:8060:8060
 
   worker:
     <<: *base_server_setup

@@ -1,6 +1,10 @@
 # Malawi Risk Watch — Backend
 
-Django backend for the Malawi Red Cross Society (MRCS) Disaster Risk Management pipeline. Ingests JBA flood forecasts and ARC parametric rainfall data, and feeds outputs into the IFRC Go platform.
+Django backend for the Malawi Red Cross Society (MRCS) Disaster Risk Management pipeline. Ingests JBA flood forecasts and ARC parametric rainfall data, processes them against Malawi administrative boundaries, and drives an email notification workflow for MRCS staff.
+
+See [`docs/data-pipeline.md`](docs/data-pipeline.md) for a full description of how JBA and ARC data is ingested, transformed, and stored — and how it drives the trigger event and notification workflow.
+
+See [`docs/ifrc-go-queries.md`](docs/ifrc-go-queries.md) for the GraphQL queries the IFRC Go platform should use to fetch map layers (HDX, JBA flood risk, ARC events) and admin area boundaries.
 
 ## Requirements
 
@@ -32,6 +36,19 @@ docker compose exec web python manage.py sync_geo
 # Preview what would be synced without writing to the database
 docker compose exec web python manage.py sync_geo --dry-run
 ```
+
+### `load_hdx_data` — Load HDX risk assessment datasets
+
+Fetches 6 HDX CSV datasets (demographics, vulnerability, flood exposure, etc.) from HEIGiT public storage and stores them in the database. Safe to re-run — existing records are updated in place.
+
+```bash
+docker compose exec web python manage.py load_hdx_data
+
+# Specify which user to set as loaded_by
+docker compose exec web python manage.py load_hdx_data --user admin@example.com
+```
+
+Requires a superuser to exist (or pass `--user`). Run `sync_geo` first so admin area boundaries are in place.
 
 ## Dummy data
 
