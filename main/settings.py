@@ -393,6 +393,8 @@ CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN")
 # CORS
 
 CORS_ALLOWED_ORIGINS = TRUSTED_ORIGINS
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True  # file:// origin (null) needs this for dev tools
 CSRF_TRUSTED_ORIGINS = TRUSTED_ORIGINS
 CORS_ALLOW_CREDENTIALS = True
 CORS_URLS_REGEX = r"(^/media/.*$)|(^/graphql/$)|(^/health-check/$)"
@@ -411,6 +413,7 @@ CORS_ALLOW_HEADERS = (
     "content-type",
     "dnt",
     "origin",
+    "range",
     "user-agent",
     "x-csrftoken",
     "x-requested-with",
@@ -418,6 +421,10 @@ CORS_ALLOW_HEADERS = (
     "sentry-trace",
     "baggage",
 )
+
+# Expose range-request response headers so browser workers can read them (needed
+# by maplibre-cog-protocol fetching COG tiles from within a worker thread).
+CORS_EXPOSE_HEADERS = ["Accept-Ranges", "Content-Encoding", "Content-Length", "Content-Range"]
 
 
 # Sentry Config

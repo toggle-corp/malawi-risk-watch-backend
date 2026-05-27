@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>JBA COG Test 2</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.21.1/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@5.21.1/dist/maplibre-gl.js"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+    html, body, #map { height: 100%; }
+
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1;
+      background: rgba(255,255,255,0.9);
+      padding: 10px 14px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: sans-serif;
+      font-size: 13px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      min-width: 180px;
+    }
+    #controls label { color: #555; }
+    #controls select,
+    #controls input[type=range] { width: 100%; }
+    #status { font-size: 11px; color: #888; }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <div>
+      <label>Lead day</label>
+      <select id="lead-select">
+        <option value="lead01">Lead day 1</option>
+        <option value="lead02">Lead day 2</option>
+        <option value="lead03">Lead day 3</option>
+        <option value="lead04">Lead day 4</option>
+        <option value="lead05">Lead day 5</option>
+        <option value="lead06">Lead day 6</option>
+        <option value="lead07">Lead day 7</option>
+        <option value="lead08">Lead day 8</option>
+        <option value="lead09">Lead day 9</option>
+        <option value="lead10">Lead day 10</option>
+      </select>
+    </div>
+    <div>
+      <label>Opacity: <span id="opacity-value">80%</span></label>
+      <input type="range" id="opacity-slider" min="0" max="100" value="80" />
+    </div>
+    <div id="status">Initialising…</div>
+  </div>
+
+  <div id="map"></div>
+
+  <script type="module">
+    import { fromUrl } from "https://esm.sh/geotiff";
+
+    const BASE_URL  = "http://localhost:8060/media/jba/tiff/2026-05-21";
+    const SOURCE_ID = "cog-source";
+    const LAYER_ID  = "cog-layer";
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://tiles.versatiles.org/assets/styles/colorful/style.json",
+      center: [34.3, -13.3],
+      zoom: 6,
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+    const select  = document.getElementById("lead-select");
+    const slider  = document.getElementById("opacity-slider");
+    const opLabel = document.getElementById("opacity-value");
+    const status  = document.getElementById("status");
+
+    function valueToRgba(t) {
+      const r = Math.round(255 * Math.min(1, t * 2));
+      const g = Math.round(255 * Math.max(0, 1 - Math.abs(t - 0.5) * 4));
+      const b = Math.round(255 * Math.max(0, 1 - t * 2));
+      const a = Math.round(200 * t + 55);
+      return [r, g, b, a];
+    }
+
+    async function loadCog(lead) {
+      status.textContent = "Loading…";
+
+      if (map.getLayer(LAYER_ID))   map.removeLayer(LAYER_ID);
+      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+
+      try {
+        const tiff       = await fromUrl(`${BASE_URL}/${lead}.tif`);
+        const imageCount = await tiff.getImageCount();
+        const fullImage  = await tiff.getImage(0);
+        const [west, south, east, north] = fullImage.getBoundingBox();
+
+        // Pick overview closest to 512×512 to balance quality vs request count.
+        const TARGET = 512 * 512;
+        let img = fullImage;
+        let best = Math.abs(fullImage.getWidth() * fullImage.getHeight() - TARGET);
+        for (let i = 1; i < imageCount; i++) {
+          const o = await tiff.getImage(i);
+          const d = Math.abs(o.getWidth() * o.getHeight() - TARGET);
+          if (d < best) { best = d; img = o; }
+        }
+
+        const [band] = await img.readRasters({ samples: [0] });
+        const w = img.getWidth(), h = img.getHeight();
+
+        let min = Infinity, max = -Infinity;
+        for (const v of band) { if (v > 0) { min = Math.min(min, v); max = Math.max(max, v); } }
+        const range = max - min || 1;
+
+        const raw = document.createElement("canvas");
+        raw.width = w; raw.height = h;
+        const rawCtx = raw.getContext("2d");
+        const imgData = rawCtx.createImageData(w, h);
+        for (let i = 0; i < band.length; i++) {
+          const v = band[i], idx = i * 4;
+          if (v <= 0) { imgData.data[idx + 3] = 0; continue; }
+          const [r, g, b, a] = valueToRgba(Math.min((v - min) / range, 1));
+          imgData.data[idx] = r; imgData.data[idx+1] = g;
+          imgData.data[idx+2] = b; imgData.data[idx+3] = a;
+        }
+        rawCtx.putImageData(imgData, 0, 0);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = w * 4; canvas.height = h * 4;
+        const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(raw, 0, 0, canvas.width, canvas.height);
+
+        map.addSource(SOURCE_ID, {
+          type: "image",
+          url: canvas.toDataURL(),
+          coordinates: [[west,north],[east,north],[east,south],[west,south]],
+        });
+        map.addLayer({
+          id: LAYER_ID, type: "raster", source: SOURCE_ID,
+          paint: { "raster-opacity": slider.value / 100 },
+        });
+
+        status.textContent = `${lead} — ${w}×${h}px`;
+      } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+        console.error(err);
+      }
+    }
+
+    map.on("load", () => loadCog(select.value));
+    select.addEventListener("change", () => loadCog(select.value));
+    slider.addEventListener("input", () => {
+      opLabel.textContent = `${slider.value}%`;
+      if (map.getLayer(LAYER_ID))
+        map.setPaintProperty(LAYER_ID, "raster-opacity", slider.value / 100);
+    });
+  </script>
+</body>
+</html>

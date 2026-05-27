@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>JBA COG Test</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { display: flex; background: #111; font-family: sans-serif; }
+
+    #sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+    #sidebar h1 { font-size: 14px; color: #fff; }
+    #sidebar p  { font-size: 11px; color: #888; line-height: 1.5; }
+
+    .control-group { display: flex; flex-direction: column; gap: 4px; }
+    .control-group label { font-size: 11px; text-transform: uppercase; color: #888; letter-spacing: 0.05em; }
+    .control-group select,
+    .control-group input[type=range] {
+      width: 100%;
+      background: #2e2e2e;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 12px;
+    }
+
+    #status {
+      font-size: 11px;
+      color: #888;
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid #333;
+    }
+    #status.loaded { color: #4caf50; }
+    #status.error  { color: #f44336; }
+
+    #map { flex: 1; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h1>JBA COG Test</h1>
+    <p>Dev tool — reads a COG from the local Django server via range requests, renders it to canvas, and overlays it on the map.</p>
+
+    <div class="control-group">
+      <label>Lead day</label>
+      <select id="lead-select">
+        <option value="lead01">Lead day 1</option>
+        <option value="lead02">Lead day 2</option>
+        <option value="lead03">Lead day 3</option>
+        <option value="lead04">Lead day 4</option>
+        <option value="lead05">Lead day 5</option>
+        <option value="lead06">Lead day 6</option>
+        <option value="lead07">Lead day 7</option>
+        <option value="lead08">Lead day 8</option>
+        <option value="lead09">Lead day 9</option>
+        <option value="lead10">Lead day 10</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Opacity <span id="opacity-value">80%</span></label>
+      <input type="range" id="opacity-slider" min="0" max="100" value="80" />
+    </div>
+
+    <div class="control-group" style="flex-direction:row;align-items:center;gap:8px;">
+      <input type="checkbox" id="basemap-toggle" checked style="width:auto;cursor:pointer;" />
+      <label for="basemap-toggle" style="text-transform:none;font-size:12px;color:#e0e0e0;cursor:pointer;">Show base map</label>
+    </div>
+
+    <div id="status">Initialising…</div>
+  </div>
+
+  <div id="map"></div>
+
+  <script type="module">
+    import { fromUrl } from "https://esm.sh/geotiff";
+
+    const BASE_URL  = "http://localhost:8060/media/jba/tiff/2026-05-21";
+    const SOURCE_ID = "jba-cog";
+    const LAYER_ID  = "jba-cog-layer";
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://demotiles.maplibre.org/style.json",
+      center: [34.3, -13.3],
+      zoom: 6,
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+    const statusEl      = document.getElementById("status");
+    const select        = document.getElementById("lead-select");
+    const slider        = document.getElementById("opacity-slider");
+    const opLabel       = document.getElementById("opacity-value");
+    const basemapToggle = document.getElementById("basemap-toggle");
+
+    let baseLayerIds = [];
+
+    function setStatus(msg, cls = "") {
+      statusEl.textContent = msg;
+      statusEl.className = cls;
+    }
+
+    // Colour ramp: transparent → blue → yellow → red (low → high flood depth)
+    function valueToRgba(t) {
+      const r = Math.round(255 * Math.min(1, t * 2));
+      const g = Math.round(255 * Math.max(0, 1 - Math.abs(t - 0.5) * 4));
+      const b = Math.round(255 * Math.max(0, 1 - t * 2));
+      const a = Math.round(220 * t + 35);
+      return [r, g, b, a];
+    }
+
+    async function loadCog(lead) {
+      setStatus("Reading COG via range requests…");
+
+      if (map.getLayer(LAYER_ID))  map.removeLayer(LAYER_ID);
+      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+
+      try {
+        const url  = `${BASE_URL}/${lead}.tif`;
+        const tiff = await fromUrl(url);
+        const imageCount = await tiff.getImageCount();
+
+        // Geo tags only exist on the full-resolution image (index 0).
+        const fullImage = await tiff.getImage(0);
+        const [west, south, east, north] = fullImage.getBoundingBox();
+
+        setStatus("Rendering…");
+
+        // Pick the overview whose pixel area is closest to a 512×512 target.
+        const TARGET_PX = 512 * 512;
+        let renderImage = fullImage;
+        let bestDiff = Math.abs(fullImage.getWidth() * fullImage.getHeight() - TARGET_PX);
+        for (let i = 1; i < imageCount; i++) {
+          const img  = await tiff.getImage(i);
+          const diff = Math.abs(img.getWidth() * img.getHeight() - TARGET_PX);
+          if (diff < bestDiff) { bestDiff = diff; renderImage = img; }
+        }
+
+        const [band] = await renderImage.readRasters({ samples: [0] });
+        const width  = renderImage.getWidth();
+        const height = renderImage.getHeight();
+
+        // Find non-zero min/max for normalisation
+        let min = Infinity, max = -Infinity;
+        for (let i = 0; i < band.length; i++) {
+          const v = band[i];
+          if (v > 0) { min = Math.min(min, v); max = Math.max(max, v); }
+        }
+        const range = max - min || 1;
+
+        // Paint raw pixels onto a small canvas at native resolution.
+        const raw    = document.createElement("canvas");
+        raw.width    = width;
+        raw.height   = height;
+        const rawCtx = raw.getContext("2d");
+        const imgData = rawCtx.createImageData(width, height);
+
+        for (let i = 0; i < band.length; i++) {
+          const v = band[i];
+          const idx = i * 4;
+          if (v <= 0) {
+            imgData.data[idx + 3] = 0;
+          } else {
+            const [r, g, b, a] = valueToRgba(Math.min((v - min) / range, 1));
+            imgData.data[idx]     = r;
+            imgData.data[idx + 1] = g;
+            imgData.data[idx + 2] = b;
+            imgData.data[idx + 3] = a;
+          }
+        }
+        rawCtx.putImageData(imgData, 0, 0);
+
+        // Scale up 4× with smoothing to soften block edges at display size.
+        const canvas  = document.createElement("canvas");
+        canvas.width  = width  * 4;
+        canvas.height = height * 4;
+        const ctx     = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(raw, 0, 0, canvas.width, canvas.height);
+
+        map.addSource(SOURCE_ID, {
+          type: "image",
+          url: canvas.toDataURL(),
+          coordinates: [
+            [west, north],
+            [east, north],
+            [east, south],
+            [west, south],
+          ],
+        });
+
+        map.addLayer({
+          id: LAYER_ID,
+          type: "raster",
+          source: SOURCE_ID,
+          paint: {
+            "raster-resampling": "nearest",
+            "raster-opacity": slider.value / 100,
+          },
+        });
+
+        setStatus(`Loaded: ${lead}.tif — ${width}×${height}px, bounds [${[west,south,east,north].map(v=>v.toFixed(2)).join(", ")}]`, "loaded");
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, "error");
+        console.error(err);
+      }
+    }
+
+    map.on("load", () => {
+      // Strip fill layers — keep only line/symbol layers as boundary overlays.
+      map.getStyle().layers
+        .filter(l => l.type === "fill")
+        .forEach(l => map.removeLayer(l.id));
+
+      // Track remaining base layers for the toggle.
+      baseLayerIds = map.getStyle().layers.map(l => l.id);
+
+      loadCog(select.value);
+    });
+
+    basemapToggle.addEventListener("change", () => {
+      const visibility = basemapToggle.checked ? "visible" : "none";
+      baseLayerIds.forEach(id => {
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visibility);
+      });
+    });
+
+    select.addEventListener("change", () => loadCog(select.value));
+
+    slider.addEventListener("input", () => {
+      opLabel.textContent = `${slider.value}%`;
+      if (map.getLayer(LAYER_ID)) {
+        map.setPaintProperty(LAYER_ID, "raster-opacity", slider.value / 100);
+      }
+    });
+  </script>
+</body>
+</html>
