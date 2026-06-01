@@ -46,3 +46,4 @@ app:
 
   secrets:
     DJANGO_SECRET_KEY: "django-secret-key"
+    SENTRY_DSN: https://sentry.mrcs.test.com

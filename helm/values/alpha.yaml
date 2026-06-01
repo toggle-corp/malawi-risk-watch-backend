@@ -1,5 +1,5 @@
 app:
-  environment: PROD
+  environment: ALPHA
 
   redis:
     enabled: true
@@ -12,6 +12,8 @@ app:
 
   worker:
     enabled: true
+    beat:
+      enabled: true
 
   env:
     # AWS
