@@ -1,14 +1,59 @@
 app:
   environment: ALPHA
 
-  redis:
-    enabled: true
+  ingress:
+  enabled: true
+  className: nginx
+
 
   postgresql:
     enabled: true
+    auth:
+      username: "mrcs"
+      database: "mrcs"
+    primary:
+      resources:
+        requests:
+          cpu: "0.2"
+          memory: 1Gi
+        limits:
+          cpu: "4"
 
   minio:
     enabled: true
+    disableWebUI: true
+    mode: standalone
+    fullnameOverride: mrcs-minio
+    global:
+      defaultStorageClass:
+    apiIngress:
+      enabled: true
+      ingressClassName: nginx
+      hostname:
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    auth:
+      forceNewKeys: true
+      rootUser: mrcs
+      rootPassword:
+    persistence:
+      enabled: true
+      size: 1Gi
+    defaultBuckets: mrcs-static,mrcs-media
+    provisioning:
+      enabled: true
+      resourcesPreset: "nano"
+      cleanupAfterFinished:
+        enabled: true
+      extraCommands:
+        - "mc anonymous set download provisioning/mrcs-static"
+        - "mc anonymous set download provisioning/mrcs-media"
+  api:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "0.2"
+        memory: 0.5Gi
 
   worker:
     enabled: true
@@ -29,10 +74,60 @@ app:
     POSTGRES_PASSWORD: "{{ $.Values.postgresql.auth.postgresPassword }}"
     POSTGRES_HOST: "{{ include \"postgresql.v1.primary.fullname\" $.Subcharts.postgresql }}"
     POSTGRES_PORT: "{{ include \"postgresql.v1.service.port\" $.Subcharts.postgresql }}"
-     # Redis
-    CELERY_REDIS_URL: "redis://{{ printf \"%s-master\" (include \"common.names.fullname\" $.Subcharts.redis) }}:6379/0"
-    CACHE_REDIS_URL: "redis://{{ printf \"%s-master\" (include \"common.names.fullname\" $.Subcharts.redis) }}:6379/1"
     # Minio (S3)
     AWS_S3_ACCESS_KEY_ID: "{{ required \".app.minio.auth.rootUser\" $.Values.minio.auth.rootUser }}"
     AWS_S3_SECRET_ACCESS_KEY: "{{ required \".app.minio.auth.rootPassword\" $.Values.minio.auth.rootPassword }}"
     AWS_S3_REGION_NAME: "us-east-1"
+    # Email
+    EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+    DEFAULT_FROM_EMAIL: "{{ required \".app.secrets.DEFAULT_FROM_EMAIL\" nil }}"
+    EMAIL_HOST: "{{ required \".app.secrets.EMAIL_HOST\" nil }}"
+    EMAIL_PORT: "{{ required \".app.secrets.EMAIL_PORT\" nil }}"
+    EMAIL_HOST_USER: "{{ required \".app.secrets.EMAIL_HOST_USER\" nil }}"
+    EMAIL_HOST_PASSWORD: "{{ required \".app.secrets.EMAIL_HOST_PASSWORD\" nil }}"
+
+  argoHook:
+    enabled: true
+    hooks:
+      collect-static:
+        command: ["/bin/bash", "-c"]
+        args:
+          - "./manage.py wait_for_resources --minio && ./manage.py collectstatic --noinput"
+      create-users:
+        enabled: true
+        hook: PostSync
+        command:
+          - ./manage.py
+          - shell
+          - -c
+          - |
+            import os;
+            from django.contrib.auth import get_user_model;
+            from django.db import transaction;
+
+            User = get_user_model()
+
+            user_credentials = [
+              user_credential.split(":")
+              for user_credential in os.environ["ADMIN_USER_EMAIL_PASSWORD_SET"].split(",")
+            ];
+
+            print("Parsed provided credentials:", user_credentials);
+
+            @transaction.atomic
+            def create_initial_users(user_credentials):
+                for name, email, password_hash in user_credentials:
+                    user, created = User.objects.update_or_create(
+                        email=email,
+                        defaults={
+                          "name": name,
+                          "password": password_hash,
+                          "is_superuser": True,
+                          "is_staff": True,
+                        },
+                    )
+                    action = "updated"
+                    if created:
+                      action = "created"
+                    print(f"Successfully {action} user({email=})");
+            create_initial_users(user_credentials);
