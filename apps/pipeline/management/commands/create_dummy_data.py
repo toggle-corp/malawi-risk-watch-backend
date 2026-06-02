@@ -56,15 +56,15 @@ SOUTHERN_DISTRICTS = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34
 # ---------------------------------------------------------------------------
 
 BAND5_SAMPLES = [
-    # (mean, median, p75, p90, max)
-    (Decimal("0.00010"), Decimal("0.00000"), Decimal("0.00000"), Decimal("0.00140"), Decimal("0.00350")),
-    (Decimal("0.00230"), Decimal("0.00000"), Decimal("0.00100"), Decimal("0.00820"), Decimal("0.02100")),
-    (Decimal("0.01540"), Decimal("0.00000"), Decimal("0.00000"), Decimal("0.04200"), Decimal("0.21000")),
-    (Decimal("0.05780"), Decimal("0.00000"), Decimal("0.02100"), Decimal("0.18600"), Decimal("0.64000")),
-    (Decimal("0.12300"), Decimal("0.03500"), Decimal("0.14900"), Decimal("0.38200"), Decimal("1.02000")),
-    (Decimal("0.00000"), Decimal("0.00000"), Decimal("0.00000"), Decimal("0.00000"), Decimal("0.00000")),
-    (Decimal("0.33200"), Decimal("0.18400"), Decimal("0.52100"), Decimal("0.84000"), Decimal("2.10000")),
-    (Decimal("0.74500"), Decimal("0.52000"), Decimal("1.10000"), Decimal("1.89000"), Decimal("4.20000")),
+    # (mean, median, p75, p90, max) — people affected; always whole numbers in 100s/1000s
+    (Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")),
+    (Decimal("100"), Decimal("0"), Decimal("0"), Decimal("200"), Decimal("500")),
+    (Decimal("200"), Decimal("0"), Decimal("100"), Decimal("400"), Decimal("900")),
+    (Decimal("500"), Decimal("0"), Decimal("200"), Decimal("800"), Decimal("1800")),
+    (Decimal("800"), Decimal("300"), Decimal("600"), Decimal("1400"), Decimal("3200")),
+    (Decimal("1200"), Decimal("700"), Decimal("1500"), Decimal("2700"), Decimal("5500")),
+    (Decimal("2500"), Decimal("1800"), Decimal("3100"), Decimal("5000"), Decimal("9600")),
+    (Decimal("4800"), Decimal("3500"), Decimal("6200"), Decimal("9400"), Decimal("18000")),
 ]
 
 # Realistic ARC rainfall values (mm) — sampled from the CSV
@@ -228,7 +228,7 @@ class Command(BaseCommand):
                     defaults={
                         "rainfall_raw": rainfall * Decimal("1.05"),
                         "rainfall": rainfall,
-                        "impact": rainfall * Decimal("0.42") if rainfall > 0 else Decimal("0"),
+                        "impact": Decimal(round(int(rainfall * 42), -2)) if rainfall > 0 else Decimal("0"),
                         "event_rp": random.choice([None, 2, 5, 10, 20]) if cell_trigger else None,  # noqa: S311
                         "cell_trigger": cell_trigger,
                         "source_csv": f"arc/csv/{obs_date}.csv",
