@@ -8,7 +8,8 @@ app:
 
   ingress:
     enabled: true
-    className: nginx
+    className:
+    host:
     annotations:
       nginx.ingress.kubernetes.io/proxy-body-size: "50m"
 
@@ -32,6 +33,33 @@ app:
 
   minio:
     enabled: false
+    disableWebUI: true
+    mode: standalone
+    fullnameOverride: mrcs-minio
+    global:
+      defaultStorageClass:
+    apiIngress:
+      enabled: true
+      ingressClassName: nginx
+      hostname: ""
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    auth:
+      forceNewKeys: true
+      rootUser: mrcs
+      rootPassword: ""
+    persistence:
+      enabled: true
+      size: 1Gi
+    defaultBuckets: mrcs-static,mrcs-media
+    provisioning:
+      enabled: true
+      resourcesPreset: "nano"
+      cleanupAfterFinished:
+        enabled: true
+      extraCommands:
+        - "mc anonymous set download provisioning/mrcs-static"
+        - "mc anonymous set download provisioning/mrcs-media"
 
   api:
     enabled: true
