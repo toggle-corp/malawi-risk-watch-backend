@@ -253,6 +253,7 @@ metadata:
 type: Opaque
 data:
   postgres-password: "dGVzdC1wYXNzd29yZA=="
+  password: "dGVzdA=="
   # We don't auto-generate LDAP password when it's not provided as we do for other passwords
 
 ---
@@ -271,14 +272,19 @@ stringData:
   AWS_S3_ACCESS_KEY_ID: "mrcs"
   AWS_S3_REGION_NAME: "us-east-1"
   AWS_S3_SECRET_ACCESS_KEY: "test-password"
-  CACHE_REDIS_URL: "redis://mrcs-redis-master:6379/1"
-  CELERY_REDIS_URL: "redis://mrcs-redis-master:6379/0"
+  DEFAULT_FROM_EMAIL: "test"
   DJANGO_SECRET_KEY: "django-secret-key"
+  EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+  EMAIL_HOST: "test"
+  EMAIL_HOST_PASSWORD: "test"
+  EMAIL_HOST_USER: "test"
+  EMAIL_PORT: "1025"
   POSTGRES_DB: "mrcs"
   POSTGRES_HOST: "mrcs-postgresql"
   POSTGRES_PASSWORD: "test-password"
   POSTGRES_PORT: "5432"
   POSTGRES_USER: "postgres"
+  SENTRY_DSN: "https://sentry.mrcs.test.com"
 
 ---
 # Source: malawi-backend-helm/charts/app/charts/minio/templates/provisioning-configmap.yaml
@@ -492,6 +498,8 @@ data:
   DJANGO_DEBUG: "false"
   FRONTEND_DOMAIN: "https://mrcs-frontend.test.com"
   SENTRY_ENABLED: "true"
+  SENTRY_PROFILE_SAMPLE_RATE: "0.2"
+  SENTRY_TRACES_SAMPLE_RATE: "0.2"
   SESSION_COOKIE_DOMAIN: ".example.com"
 
 ---
@@ -849,8 +857,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: 9636ce01f3ee2d423114d2c5170fdc7f1c8a9bb6d116135e09eb0857094b3bc9
-        checksum/configmap: a1f75f7950fba8e1ed5eb75970ff7c4287e7f18d7c01fc1d7b41ebc2e691f55e
+        checksum/secret: 7ca35b420f1b3dbb3cef02e839ee53860966beb6ae43958bcb7e3db87cb521b1
+        checksum/configmap: 4be3590137bf021e1f1fd0727db13721d01f35fb700cce33fcb03cad0899141d
       labels:
         app: release-name-app
         component: api
@@ -871,8 +879,8 @@ spec:
               cpu: "0.5"
               memory: 1Gi
             requests:
-              cpu: "0.3"
-              memory: 0.4Gi
+              cpu: "0.2"
+              memory: 0.5Gi
           envFrom:
             - secretRef:
                 name: release-name-app-secret
@@ -881,6 +889,70 @@ spec:
           env:
             - name: APP_TYPE
               value: "web"
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: CACHE_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/1
+
+---
+# Source: malawi-backend-helm/charts/app/templates/worker-beat/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-app-worker-beat
+  annotations:
+    reloader.stakater.com/auto: "true"
+  labels:
+    app: release-name-app
+    component: worker-beat
+    environment: ALPHA
+    release: release-name
+spec:
+  replicas: 1  # This should only 1
+  selector:
+    matchLabels:
+      app: release-name-app
+      component: worker-beat
+  template:
+    metadata:
+      annotations:
+        checksum/secret: 7ca35b420f1b3dbb3cef02e839ee53860966beb6ae43958bcb7e3db87cb521b1
+        checksum/configmap: 4be3590137bf021e1f1fd0727db13721d01f35fb700cce33fcb03cad0899141d
+      labels:
+        app: release-name-app
+        component: worker-beat
+    spec:
+      containers:
+        - name: worker-beat
+          image: "SET-BY-CICD-IMAGE:SET-BY-CICD-TAG"
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - main
+            - beat
+            - -l
+            - INFO
+          # TODO: livenessProbe
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: "0.1"
+              memory: 0.5Gi
+          envFrom:
+            - secretRef:
+                name: release-name-app-secret
+            - configMapRef:
+                name: release-name-app-env-name
+          env:
+            - name: APP_TYPE
+              value: "worker"
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: CACHE_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/1
 
 ---
 # Source: malawi-backend-helm/charts/app/templates/worker/deployment.yaml
@@ -898,6 +970,7 @@ metadata:
     environment: ALPHA
     release: release-name
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: release-name-app
@@ -906,8 +979,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: 9636ce01f3ee2d423114d2c5170fdc7f1c8a9bb6d116135e09eb0857094b3bc9
-        checksum/configmap: a1f75f7950fba8e1ed5eb75970ff7c4287e7f18d7c01fc1d7b41ebc2e691f55e
+        checksum/secret: 7ca35b420f1b3dbb3cef02e839ee53860966beb6ae43958bcb7e3db87cb521b1
+        checksum/configmap: 4be3590137bf021e1f1fd0727db13721d01f35fb700cce33fcb03cad0899141d
       labels:
         app: release-name-app
         component: worker
@@ -918,12 +991,12 @@ spec:
           command:
             - celery
             - -A
-            - myapp
+            - main
             - worker
             - -l
             - INFO
             - -Q
-            - celery
+            - default
             - --concurrency
             - "4"
             - --max-tasks-per-child
@@ -946,6 +1019,10 @@ spec:
           env:
             - name: APP_TYPE
               value: "worker"
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: CACHE_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/1
 
 ---
 # Source: malawi-backend-helm/charts/app/charts/postgresql/templates/primary/statefulset.yaml
@@ -1035,7 +1112,14 @@ spec:
             - name: PGDATA
               value: "/bitnami/postgresql/data"
             # Authentication
+            - name: POSTGRES_USER
+              value: "mrcs"
             - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mrcs-postgresql
+                  key: password
+            - name: POSTGRES_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mrcs-postgresql
@@ -1075,7 +1159,7 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - exec pg_isready -U "postgres" -d "dbname=mrcs" -h 127.0.0.1 -p 5432
+                - exec pg_isready -U "mrcs" -d "dbname=mrcs" -h 127.0.0.1 -p 5432
           readinessProbe:
             failureThreshold: 6
             initialDelaySeconds: 5
@@ -1088,16 +1172,13 @@ spec:
                 - -c
                 - -e
                 - |
-                  exec pg_isready -U "postgres" -d "dbname=mrcs" -h 127.0.0.1 -p 5432
+                  exec pg_isready -U "mrcs" -d "dbname=mrcs" -h 127.0.0.1 -p 5432
           resources:
             limits:
-              cpu: 150m
-              ephemeral-storage: 2Gi
-              memory: 192Mi
+              cpu: "4"
             requests:
-              cpu: 100m
-              ephemeral-storage: 50Mi
-              memory: 128Mi
+              cpu: "0.2"
+              memory: 1Gi
           volumeMounts:
             - name: empty-dir
               mountPath: /tmp
@@ -1128,7 +1209,7 @@ spec:
           - "ReadWriteOnce"
         resources:
           requests:
-            storage: "1Gi"
+            storage: "2Gi"
         
 
 ---
@@ -1322,8 +1403,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: 9636ce01f3ee2d423114d2c5170fdc7f1c8a9bb6d116135e09eb0857094b3bc9
-        checksum/configmap: a1f75f7950fba8e1ed5eb75970ff7c4287e7f18d7c01fc1d7b41ebc2e691f55e
+        checksum/secret: 7ca35b420f1b3dbb3cef02e839ee53860966beb6ae43958bcb7e3db87cb521b1
+        checksum/configmap: 4be3590137bf021e1f1fd0727db13721d01f35fb700cce33fcb03cad0899141d
       labels:
         app: release-name-app
         component: argo-hooks
@@ -1336,6 +1417,7 @@ spec:
           command: 
             - /bin/bash
             - -c
+          args: 
             - ./manage.py wait_for_resources --minio && ./manage.py collectstatic --noinput
           resources:
             limits:
@@ -1352,6 +1434,88 @@ spec:
           env:
             - name: APP_TYPE
               value: "hook"
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: CACHE_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/1
+---
+# Source: malawi-backend-helm/charts/app/templates/argo-hooks/hook-job.yaml
+# Hook: create-users
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: release-name-app-create-users
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+spec:
+  template:
+    metadata:
+      annotations:
+        checksum/secret: 7ca35b420f1b3dbb3cef02e839ee53860966beb6ae43958bcb7e3db87cb521b1
+        checksum/configmap: 4be3590137bf021e1f1fd0727db13721d01f35fb700cce33fcb03cad0899141d
+      labels:
+        app: release-name-app
+        component: argo-hooks
+    spec:
+      restartPolicy: "Never"
+      containers:
+        - name: create-users
+          image: "SET-BY-CICD-IMAGE:SET-BY-CICD-TAG"
+          imagePullPolicy: IfNotPresent
+          command: 
+            - ./manage.py
+            - shell
+            - -c
+            - |
+              import os;
+              from django.contrib.auth import get_user_model;
+              from django.db import transaction;
+            
+              User = get_user_model()
+            
+              user_credentials = [
+                user_credential.split(":")
+                for user_credential in os.environ["ADMIN_USER_EMAIL_PASSWORD_SET"].split(",")
+              ];
+            
+              print("Parsed provided credentials:", user_credentials);
+            
+              @transaction.atomic
+              def create_initial_users(user_credentials):
+                  for name, email, password_hash in user_credentials:
+                      user, created = User.objects.update_or_create(
+                          email=email,
+                          defaults={
+                            "name": name,
+                            "password": password_hash,
+                            "is_superuser": True,
+                            "is_staff": True,
+                          },
+                      )
+                      action = "updated"
+                      if created:
+                        action = "created"
+                      print(f"Successfully {action} user({email=})");
+              create_initial_users(user_credentials);
+          resources:
+            limits:
+              cpu: "1"
+              memory: 2Gi
+            requests:
+              cpu: "0.1"
+              memory: 1Gi
+          envFrom:
+            - secretRef:
+                name: release-name-app-secret
+            - configMapRef:
+                name: release-name-app-env-name
+          env:
+            - name: APP_TYPE
+              value: "hook"
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: CACHE_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/1
 ---
 # Source: malawi-backend-helm/charts/app/templates/argo-hooks/hook-job.yaml
 # Hook: db-migrate
@@ -1365,8 +1529,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: 9636ce01f3ee2d423114d2c5170fdc7f1c8a9bb6d116135e09eb0857094b3bc9
-        checksum/configmap: a1f75f7950fba8e1ed5eb75970ff7c4287e7f18d7c01fc1d7b41ebc2e691f55e
+        checksum/secret: 7ca35b420f1b3dbb3cef02e839ee53860966beb6ae43958bcb7e3db87cb521b1
+        checksum/configmap: 4be3590137bf021e1f1fd0727db13721d01f35fb700cce33fcb03cad0899141d
       labels:
         app: release-name-app
         component: argo-hooks
@@ -1395,6 +1559,10 @@ spec:
           env:
             - name: APP_TYPE
               value: "hook"
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: CACHE_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/1
 
 ---
 # Source: malawi-backend-helm/charts/app/charts/minio/templates/api-ingress.yaml
@@ -1412,6 +1580,7 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: 50m
 spec:
+  ingressClassName: "nginx"
   rules:
     - host: mrcs-minio.test.com
       http:
@@ -1450,6 +1619,35 @@ spec:
                 name: release-name-app-api
                 port:
                   number: 80
+
+---
+# Source: malawi-backend-helm/charts/app/templates/extraManifests.yaml
+# Manifest: dragonflydb-cluster
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  labels:
+    app.kubernetes.io/name: dragonfly
+  name: mrcs-dragonfly
+spec:
+  args:
+  - --dbfilename=mainSnapshot
+  replicas: 1
+  resources:
+    limits:
+      cpu: "1"
+      memory: 750Mi
+    requests:
+      cpu: "0.1"
+      memory: 500Mi
+  snapshot:
+    cron: '*/5 * * * *'
+    persistentVolumeClaimSpec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
 ---
 # Source: malawi-backend-helm/charts/app/charts/minio/templates/provisioning-job.yaml
 apiVersion: batch/v1

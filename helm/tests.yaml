@@ -1,3 +1,4 @@
 tests:
   alpha.yaml:
     - values/alpha.yaml
+    - values/operators.yaml

@@ -22,6 +22,7 @@ app:
     architecture: standalone
     auth:
       postgresPassword: "test-password"
+      password: "test"
 
 
   minio:
@@ -46,3 +47,9 @@ app:
 
   secrets:
     DJANGO_SECRET_KEY: "django-secret-key"
+    SENTRY_DSN: https://sentry.mrcs.test.com
+    DEFAULT_FROM_EMAIL: test
+    EMAIL_HOST: test
+    EMAIL_PORT: "1025"
+    EMAIL_HOST_USER: test
+    EMAIL_HOST_PASSWORD: test

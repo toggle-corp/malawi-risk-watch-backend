@@ -1,0 +1,35 @@
+app:
+  extraEnvVars:
+    #  Dragonfly
+    - name: CELERY_REDIS_URL
+      value: redis://mrcs-dragonfly:6379/0
+    - name: CACHE_REDIS_URL
+      value: redis://mrcs-dragonfly:6379/1
+
+  extraManifests:
+    dragonflydb-cluster:
+      apiVersion: dragonflydb.io/v1alpha1
+      kind: Dragonfly
+      metadata:
+        labels:
+          app.kubernetes.io/name: dragonfly
+        name: mrcs-dragonfly
+      spec:
+        replicas: 1
+        args: ["--dbfilename=mainSnapshot"]
+        resources:
+          requests:
+            cpu: "0.1"
+            memory: 500Mi
+          limits:
+            cpu: "1"
+            memory: 750Mi
+        snapshot:
+          cron: "*/5 * * * *"  # NOTE: Creates a snapshot of in-memory data every 5 minutes and saves it to the persistent volume.
+          persistentVolumeClaimSpec:
+            # storageClassName:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
