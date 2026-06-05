@@ -42,6 +42,10 @@ coverage.xml
 # Django stuff
 *.log
 
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
 # Env files
 .env
 .env*
