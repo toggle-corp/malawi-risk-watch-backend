@@ -60,6 +60,7 @@ class JbaIngestionRun(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
+    id: int
     # reverse relation type hints
     forecast_files: typing.ClassVar[RelatedManager["FloodForecastFile"]]
 
@@ -71,6 +72,11 @@ class JbaIngestionRun(models.Model):
     @typing.override
     def __str__(self) -> str:
         return f"JBA run {self.run_date} [{self.status}]"
+
+    def set_status(self, status: IngestionStatus):
+        self.status = status
+        update_fields = ["status"]
+        self.save(update_fields=update_fields)
 
 
 class FloodForecastFile(models.Model):
