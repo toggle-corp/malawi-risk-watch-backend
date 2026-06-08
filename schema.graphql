@@ -118,6 +118,55 @@ type AppEnumCollectionUserRole {
 }
 
 """
+Tracks each daily ARC fetch job.
+
+Mirrors JbaIngestionRun so operators have a single place to check whether
+today's ingestion ran successfully and to diagnose failures.
+"""
+input ArcIngestionRunFilter {
+  id: ID
+  status: String
+  runDate: DateDateFilterLookup
+  AND: ArcIngestionRunFilter
+  OR: ArcIngestionRunFilter
+  NOT: ArcIngestionRunFilter
+  DISTINCT: Boolean
+}
+
+input ArcIngestionRunOrder @oneOf {
+  runDate: Ordering
+  startedAt: Ordering
+}
+
+"""
+Tracks each daily ARC fetch job.
+
+Mirrors JbaIngestionRun so operators have a single place to check whether
+today's ingestion ran successfully and to diagnose failures.
+"""
+type ArcIngestionRunType {
+  id: ID!
+  runDate: Date!
+  status: String!
+  rowsExpected: Int
+  rowsProcessed: Int
+  sourceCsv: DjangoFileType
+  errorLog: JSON
+  startedAt: DateTime!
+  completedAt: DateTime
+}
+
+type ArcIngestionRunTypeOffsetPaginated {
+  pageInfo: OffsetPaginationInfo!
+
+  """Total count of existing results."""
+  totalCount: Int!
+
+  """List of paginated results."""
+  results: [ArcIngestionRunType!]!
+}
+
+"""
 ARC parametric rainfall observation, keyed by admin area.
 
 Column name cell_trigger is preserved from the JBA source CSV for
@@ -126,6 +175,7 @@ traceability — do not rename.
 input ArcRainfallObservationFilter {
   id: ID
   adminAreaId: ID
+  ingestionRunId: ID
   cellTrigger: Boolean
   observationDate: DateDateFilterLookup
   AND: ArcRainfallObservationFilter
@@ -147,6 +197,7 @@ traceability — do not rename.
 """
 type ArcRainfallObservationType {
   id: ID!
+  ingestionRunId: ID
   observationDate: Date!
   adminAreaId: ID!
   adminArea: AdminAreaType!
@@ -155,7 +206,6 @@ type ArcRainfallObservationType {
   impact: Decimal
   eventRp: Int
   cellTrigger: Boolean!
-  sourceCsv: DjangoFileType
   ingestedAt: DateTime!
 }
 
@@ -557,6 +607,8 @@ type Query {
   floodForecastFiles(pagination: OffsetPaginationInput, filters: FloodForecastFileFilter, order: FloodForecastFileOrder): FloodForecastFileTypeOffsetPaginated!
   floodForecastFile(id: ID!): FloodForecastFileType!
   floodForecastImpacts(pagination: OffsetPaginationInput, filters: FloodForecastImpactFilter, order: FloodForecastImpactOrder): FloodForecastImpactTypeOffsetPaginated!
+  arcIngestionRuns(pagination: OffsetPaginationInput, filters: ArcIngestionRunFilter, order: ArcIngestionRunOrder): ArcIngestionRunTypeOffsetPaginated!
+  arcIngestionRun(id: ID!): ArcIngestionRunType!
   arcRainfallObservations(pagination: OffsetPaginationInput, filters: ArcRainfallObservationFilter, order: ArcRainfallObservationOrder): ArcRainfallObservationTypeOffsetPaginated!
   arcTriggerEvents(pagination: OffsetPaginationInput, filters: ArcTriggerEventFilter, order: ArcTriggerEventOrder): ArcTriggerEventTypeOffsetPaginated!
   arcTriggerEvent(id: ID!): ArcTriggerEventType!

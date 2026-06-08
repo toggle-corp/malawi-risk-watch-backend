@@ -1,11 +1,8 @@
 """Cloud-Optimized GeoTIFF (COG) conversion utilities."""
 
+import subprocess
 import tempfile
 from pathlib import Path
-
-from osgeo import gdal
-
-gdal.UseExceptions()  # turn GDAL errors into Python exceptions instead of silent failures
 
 
 def convert_to_cog(input_path: str | Path, output_path: str | Path) -> None:
@@ -17,19 +14,32 @@ def convert_to_cog(input_path: str | Path, output_path: str | Path) -> None:
     Uses deflate compression (lossless — safe for flood depth values).
     Cubic resampling for both the reprojection-to-grid and overview steps gives
     smooth rendering at all zoom levels (avoids the blur from nearest-neighbour).
+
+    Requires gdal-bin to be installed (gdal_translate on PATH).
+    In Docker this comes from the gdal-bin apt package.
     """
-    gdal.Translate(
-        str(output_path),
-        str(input_path),
-        format="COG",
-        creationOptions=[
-            "TILING_SCHEME=GoogleMapsCompatible",  # reproject + tile to Web Mercator grid
-            "WARP_RESAMPLING=CUBIC",               # resampling for the reprojection-to-grid step
-            "OVERVIEW_RESAMPLING=CUBIC",           # resampling for the overview pyramids
-            "COMPRESS=DEFLATE",                    # lossless — preserves exact depth values
-            "PREDICTOR=YES",                       # better deflate ratio on continuous float data
+    subprocess.run(  # noqa: S603
+        [  # noqa: S607
+            "gdal_translate",
+            "-of",
+            "COG",
+            "-co",
+            "TILING_SCHEME=GoogleMapsCompatible",
+            "-co",
+            "WARP_RESAMPLING=CUBIC",
+            "-co",
+            "OVERVIEW_RESAMPLING=CUBIC",
+            "-co",
+            "COMPRESS=DEFLATE",
+            "-co",
+            "PREDICTOR=YES",
+            "-co",
             "BIGTIFF=IF_SAFER",
+            str(input_path),
+            str(output_path),
         ],
+        check=True,
+        capture_output=True,
     )
 
 

@@ -595,12 +595,6 @@ wheels = [
 ]
 
 [[package]]
-name = "gdal"
-version = "3.6.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/49/4f/174743caf64d1999c46ab2ee72b2cb0d77a47bd7ed04f954f863e35a25fd/GDAL-3.6.2.tar.gz", hash = "sha256:a167cde1813707d91a938dad1a22f280f5ad28c45980d42e948fb8c59f890f5a", size = 757691, upload-time = "2023-01-05T07:36:55.213Z" }
-
-[[package]]
 name = "graphql-core"
 version = "3.2.8"
 source = { registry = "https://pypi.org/simple" }
@@ -787,7 +781,6 @@ dependencies = [
     { name = "djangoql" },
     { name = "djangorestframework" },
     { name = "drf-spectacular" },
-    { name = "gdal" },
     { name = "gunicorn" },
     { name = "psycopg2-binary" },
     { name = "redis" },
@@ -826,7 +819,6 @@ requires-dist = [
     { name = "djangoql", specifier = ">=0.19.1" },
     { name = "djangorestframework", specifier = ">=3.15" },
     { name = "drf-spectacular", specifier = ">=0.29.0" },
-    { name = "gdal", specifier = "==3.6.2" },
     { name = "gunicorn", specifier = ">=23.0" },
     { name = "psycopg2-binary", specifier = ">=2.9" },
     { name = "redis", specifier = ">=5.0" },

@@ -10,7 +10,7 @@ from django_stubs_ext.db.models.manager import RelatedManager
 
 
 class IngestionStatus(models.TextChoices):
-    """Status of a JBA ingestion run."""
+    """Status of a JBA or ARC ingestion run."""
 
     PENDING = "pending", "Pending"
     RUNNING = "running", "Running"
@@ -168,6 +168,41 @@ class FloodForecastImpact(models.Model):
 # ---------------------------------------------------------------------------
 
 
+class ArcIngestionRun(models.Model):
+    """Tracks each daily ARC fetch job.
+
+    Mirrors JbaIngestionRun so operators have a single place to check whether
+    today's ingestion ran successfully and to diagnose failures.
+    """
+
+    Status = IngestionStatus  # convenience alias
+
+    run_date = models.DateField(unique=True)
+    status = models.CharField(
+        max_length=20,
+        choices=IngestionStatus.choices,
+        default=IngestionStatus.PENDING,
+    )
+    rows_expected = models.IntegerField(null=True, blank=True)
+    rows_processed = models.IntegerField(null=True, blank=True)
+    source_csv = models.FileField(upload_to="arc/csv/", null=True, blank=True)
+    error_log = models.JSONField(null=True, blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    # reverse relation type hints
+    observations: typing.ClassVar[RelatedManager["ArcRainfallObservation"]]
+
+    class Meta:
+        verbose_name = "ARC Ingestion Run"
+        verbose_name_plural = "ARC Ingestion Runs"
+        ordering = ["-run_date"]
+
+    @typing.override
+    def __str__(self) -> str:
+        return f"ARC run {self.run_date} [{self.status}]"
+
+
 class ArcRainfallObservation(models.Model):
     """ARC parametric rainfall observation, keyed by admin area.
 
@@ -175,6 +210,13 @@ class ArcRainfallObservation(models.Model):
     traceability — do not rename.
     """
 
+    ingestion_run = models.ForeignKey(
+        ArcIngestionRun,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="observations",
+    )
     observation_date = models.DateField()
     admin_area = models.ForeignKey(
         "admin_areas.AdminArea",
@@ -186,7 +228,6 @@ class ArcRainfallObservation(models.Model):
     impact = models.DecimalField(max_digits=20, decimal_places=8, null=True, blank=True)
     event_rp = models.IntegerField(null=True, blank=True)
     cell_trigger = models.BooleanField()
-    source_csv = models.FileField(upload_to="arc/csv/", null=True, blank=True)
     ingested_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

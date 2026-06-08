@@ -1,6 +1,7 @@
 """Management command to seed realistic dummy data for local development.
 
 Creates:
+  - Malawi administrative hierarchy (country → 3 regions → 28 districts)
   - 3 users (admin, reviewer, viewer)
   - 2 JBA ingestion runs with forecast files and per-district impacts
   - ARC rainfall observations for all districts across 3 dates
@@ -23,9 +24,11 @@ from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from apps.admin_areas.models import AdminArea
 from apps.notifications.models import NotificationLog, NotificationRecipient
 from apps.pipeline.cog import convert_to_cog_bytes
 from apps.pipeline.models import (
+    ArcIngestionRun,
     ArcRainfallObservation,
     ArcTriggerEvent,
     FloodForecastFile,
@@ -40,23 +43,56 @@ from apps.users.models import User
 DUMMY_TIFF = Path(__file__).resolve().parents[4] / "dummy" / "dummy.tif"
 
 # ---------------------------------------------------------------------------
-# Admin area ID constants (PKs already in the database after sync_geo)
+# Malawi administrative hierarchy
 # ---------------------------------------------------------------------------
 
-DISTRICT_IDS = list(range(5, 37))  # 5–36 inclusive (32 districts, level 2)
-REGION_IDS = [2, 3, 4]  # level 1: Central, Northern, Southern
+MALAWI_REGIONS = [
+    {"pcode": "MW1", "name": "Northern Region", "ifrc_id": 1},
+    {"pcode": "MW2", "name": "Central Region", "ifrc_id": 2},
+    {"pcode": "MW3", "name": "Southern Region", "ifrc_id": 3},
+]
 
-# Districts grouped roughly by region for realistic recipient scoping
-NORTHERN_DISTRICTS = [5, 6, 7, 8, 9]
-CENTRAL_DISTRICTS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-SOUTHERN_DISTRICTS = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+# (pcode, name, region_pcode) — 28 official Malawi districts
+MALAWI_DISTRICTS = [
+    # Northern
+    ("MW101", "Chitipa", "MW1"),
+    ("MW102", "Karonga", "MW1"),
+    ("MW103", "Likoma", "MW1"),
+    ("MW104", "Mzimba", "MW1"),
+    ("MW105", "Nkhata Bay", "MW1"),
+    ("MW106", "Rumphi", "MW1"),
+    # Central
+    ("MW201", "Dedza", "MW2"),
+    ("MW202", "Dowa", "MW2"),
+    ("MW203", "Kasungu", "MW2"),
+    ("MW204", "Lilongwe", "MW2"),
+    ("MW205", "Mchinji", "MW2"),
+    ("MW206", "Nkhotakota", "MW2"),
+    ("MW207", "Ntcheu", "MW2"),
+    ("MW208", "Ntchisi", "MW2"),
+    ("MW209", "Salima", "MW2"),
+    # Southern
+    ("MW301", "Balaka", "MW3"),
+    ("MW302", "Blantyre", "MW3"),
+    ("MW303", "Chikwawa", "MW3"),
+    ("MW304", "Chiradzulu", "MW3"),
+    ("MW305", "Machinga", "MW3"),
+    ("MW306", "Mangochi", "MW3"),
+    ("MW307", "Mulanje", "MW3"),
+    ("MW308", "Mwanza", "MW3"),
+    ("MW309", "Neno", "MW3"),
+    ("MW310", "Nsanje", "MW3"),
+    ("MW311", "Phalombe", "MW3"),
+    ("MW312", "Thyolo", "MW3"),
+    ("MW313", "Zomba", "MW3"),
+]
 
 # ---------------------------------------------------------------------------
-# Realistic band_5 value ranges drawn from the JBA CSV sample
+# Realistic band_5 value ranges — people affected; always whole numbers in 100s/1000s
 # ---------------------------------------------------------------------------
 
 BAND5_SAMPLES = [
-    # (mean, median, p75, p90, max) — people affected; always whole numbers in 100s/1000s
+    # (mean, median, p75, p90, max)
     (Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")),
     (Decimal("100"), Decimal("0"), Decimal("0"), Decimal("200"), Decimal("500")),
     (Decimal("200"), Decimal("0"), Decimal("100"), Decimal("400"), Decimal("900")),
@@ -90,14 +126,51 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         random.seed(42)
 
+        district_ids, northern_ids, central_ids, southern_ids = self._create_admin_areas()
         self._create_users()
-        self._create_jba_data()
-        self._create_arc_data()
-        self._create_recipients()
+        self._create_jba_data(district_ids)
+        self._create_arc_data(district_ids, northern_ids, central_ids, southern_ids)
+        self._create_recipients(district_ids, northern_ids, central_ids, southern_ids)
         self._create_notification_logs()
         self._create_hdx_dataset()
 
         self.stdout.write(self.style.SUCCESS("Dummy data created successfully."))
+
+    # ------------------------------------------------------------------
+    # Admin areas
+    # ------------------------------------------------------------------
+
+    def _create_admin_areas(self) -> tuple[list[int], list[int], list[int], list[int]]:
+        country, _ = AdminArea.objects.get_or_create(
+            pcode="MW",
+            defaults={"name": "Malawi", "level": 0},
+        )
+
+        region_objs: dict[str, AdminArea] = {}
+        for r in MALAWI_REGIONS:
+            pcode = typing.cast("str", r["pcode"])
+            obj, _ = AdminArea.objects.get_or_create(
+                pcode=pcode,
+                defaults={"name": r["name"], "level": 1, "parent": country, "ifrc_id": r["ifrc_id"]},
+            )
+            region_objs[pcode] = obj
+
+        northern_ids, central_ids, southern_ids = [], [], []
+        for pcode, name, region_pcode in MALAWI_DISTRICTS:
+            obj, _ = AdminArea.objects.get_or_create(
+                pcode=pcode,
+                defaults={"name": name, "level": 2, "parent": region_objs[region_pcode]},
+            )
+            if region_pcode == "MW1":
+                northern_ids.append(obj.pk)
+            elif region_pcode == "MW2":
+                central_ids.append(obj.pk)
+            else:
+                southern_ids.append(obj.pk)
+
+        all_ids = northern_ids + central_ids + southern_ids
+        self.stdout.write(f"  Admin areas ready: 1 country, 3 regions, {len(all_ids)} districts")
+        return all_ids, northern_ids, central_ids, southern_ids
 
     # ------------------------------------------------------------------
     # Users
@@ -131,13 +204,12 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _get_dummy_cog_path(self, storage_key: str) -> str:
-        """Convert dummy.tif to COG and save to storage, returning the storage path."""
         if default_storage.exists(storage_key):
             return storage_key
         cog_bytes = convert_to_cog_bytes(DUMMY_TIFF)
         return default_storage.save(storage_key, ContentFile(cog_bytes))
 
-    def _create_jba_data(self) -> None:
+    def _create_jba_data(self, district_ids: list[int]) -> None:
         today = date.today()
         self.stdout.write("  Converting dummy TIFF to COG …")
         runs_spec = [
@@ -164,7 +236,6 @@ class Command(BaseCommand):
                     "status": spec["status"],
                     "files_expected": spec["files_expected"],
                     "files_processed": spec["files_processed"],
-                    # One CSV covers all lead times for the run
                     "csv": f"jba/csv/{issue_date}/impacts.csv",
                     "completed_at": timezone.now() - timedelta(days=(today - issue_date).days),
                 },
@@ -174,7 +245,6 @@ class Command(BaseCommand):
             if not created:
                 continue
 
-            # Create one COG TIFF per lead time (1–10 days)
             for lead_days in range(1, 11):
                 target_date = issue_date + timedelta(days=lead_days)
                 storage_key = f"jba/tiff/{issue_date}/lead{lead_days:02d}.tif"
@@ -190,8 +260,7 @@ class Command(BaseCommand):
                     },
                 )
 
-                # Create per-district impacts
-                for district_id in DISTRICT_IDS:
+                for district_id in district_ids:
                     sample = random.choice(BAND5_SAMPLES)  # noqa: S311
                     FloodForecastImpact.objects.get_or_create(
                         forecast_issue_date=issue_date,
@@ -214,33 +283,50 @@ class Command(BaseCommand):
     # ARC rainfall + trigger events
     # ------------------------------------------------------------------
 
-    def _create_arc_data(self) -> None:
+    def _create_arc_data(
+        self,
+        district_ids: list[int],
+        northern_ids: list[int],
+        central_ids: list[int],
+        southern_ids: list[int],
+    ) -> None:
         today = date.today()
         obs_dates = [today - timedelta(days=d) for d in (14, 7, 0)]
 
         for obs_date in obs_dates:
-            for district_id in DISTRICT_IDS:
+            run, created = ArcIngestionRun.objects.get_or_create(
+                run_date=obs_date,
+                defaults={
+                    "status": IngestionStatus.SUCCESS,
+                    "rows_expected": len(district_ids),
+                    "rows_processed": len(district_ids),
+                    "source_csv": f"arc/csv/{obs_date}.csv",
+                    "completed_at": timezone.now() - timedelta(days=(today - obs_date).days),
+                },
+            )
+            action = "Created" if created else "Skipped"
+            self.stdout.write(f"  {action} ARC run: {run.run_date}")
+
+            for district_id in district_ids:
                 rainfall = random.choice(ARC_RAINFALL_SAMPLES)  # noqa: S311
                 cell_trigger = rainfall >= Decimal("25.400")
                 ArcRainfallObservation.objects.get_or_create(
                     observation_date=obs_date,
                     admin_area_id=district_id,
                     defaults={
+                        "ingestion_run": run,
                         "rainfall_raw": rainfall * Decimal("1.05"),
                         "rainfall": rainfall,
                         "impact": Decimal(round(int(rainfall * 42), -2)) if rainfall > 0 else Decimal("0"),
                         "event_rp": random.choice([None, 2, 5, 10, 20]) if cell_trigger else None,  # noqa: S311
                         "cell_trigger": cell_trigger,
-                        "source_csv": f"arc/csv/{obs_date}.csv",
                     },
                 )
 
-        self.stdout.write(f"  ARC observations created for {len(obs_dates)} dates × {len(DISTRICT_IDS)} districts")
+        self.stdout.write(f"  ARC observations created for {len(obs_dates)} dates × {len(district_ids)} districts")
 
-        # Trigger events — one per obs date, varying statuses
         reviewer = User.objects.filter(email="reviewer@example.com").first()
-
-        triggered_ids = [d for d in DISTRICT_IDS if d % 3 == 0]  # subset that "triggered"
+        triggered_ids = [d for d in district_ids if district_ids.index(d) % 3 == 0]
 
         events_spec = [
             dict(
@@ -284,39 +370,20 @@ class Command(BaseCommand):
     # Notification recipients
     # ------------------------------------------------------------------
 
-    def _create_recipients(self) -> None:
+    def _create_recipients(
+        self,
+        district_ids: list[int],
+        northern_ids: list[int],
+        central_ids: list[int],
+        southern_ids: list[int],
+    ) -> None:
         admin_user = User.objects.filter(email="admin@example.com").first()
         recipients = [
-            dict(
-                email="alice@dccm.mw",
-                name="Alice Banda",
-                organization="DCCM",
-                admin_area_ids=NORTHERN_DISTRICTS,
-            ),
-            dict(
-                email="bob@dccm.mw",
-                name="Bob Phiri",
-                organization="DCCM",
-                admin_area_ids=CENTRAL_DISTRICTS,
-            ),
-            dict(
-                email="carol@mrcs.mw",
-                name="Carol Mwale",
-                organization="MRCS",
-                admin_area_ids=SOUTHERN_DISTRICTS,
-            ),
-            dict(
-                email="david@undp.mw",
-                name="David Tembo",
-                organization="UNDP",
-                admin_area_ids=DISTRICT_IDS,  # all districts
-            ),
-            dict(
-                email="inactive@example.com",
-                name="Inactive User",
-                organization="Test",
-                admin_area_ids=DISTRICT_IDS[:5],
-            ),
+            dict(email="alice@dccm.mw", name="Alice Banda", organization="DCCM", admin_area_ids=northern_ids),
+            dict(email="bob@dccm.mw", name="Bob Phiri", organization="DCCM", admin_area_ids=central_ids),
+            dict(email="carol@mrcs.mw", name="Carol Mwale", organization="MRCS", admin_area_ids=southern_ids),
+            dict(email="david@undp.mw", name="David Tembo", organization="UNDP", admin_area_ids=district_ids),
+            dict(email="inactive@example.com", name="Inactive User", organization="Test", admin_area_ids=district_ids[:5]),
         ]
         for r in recipients:
             obj, created = NotificationRecipient.objects.get_or_create(
