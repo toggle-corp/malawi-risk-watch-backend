@@ -36,6 +36,7 @@ env = environ.Env(
     DJANGO_SECRET_KEY=str,
     ADDITIONAL_ALLOWED_HOSTS=(list, []),  # Eg: api.example.org
     APP_ENVIRONMENT=str,  # DEV, STAGE, PROD
+    APP_RELEASE=(str, None),
     APP_TYPE=str,  # WEB, WORKER, WORKER-BEAT
     APP_LOG_LEVEL=(str, "INFO"),
     MEDIA_STORAGE_DOMAIN=(str, None),
@@ -109,6 +110,7 @@ MEDIA_STORAGE_DOMAIN = urlparse(env("MEDIA_STORAGE_DOMAIN")) or APP_DOMAIN
 APP_ENVIRONMENT = env("APP_ENVIRONMENT").upper()
 APP_TYPE = env("APP_TYPE").upper()
 SECRET_KEY = env("DJANGO_SECRET_KEY")
+APP_RELEASE = env("APP_RELEASE")
 DEBUG = env("DEBUG")
 
 ALLOWED_HOSTS = [
@@ -428,7 +430,7 @@ if SENTRY_ENABLED:
         dsn=env("SENTRY_DSN"),
         debug=env("SENTRY_DEBUG"),
         app_type=APP_TYPE,
-        # release=APP_RELEASE,
+        release=APP_RELEASE,
         environment=APP_ENVIRONMENT,
         send_default_pii=True,
         traces_sample_rate=env("SENTRY_TRACES_SAMPLE_RATE"),
