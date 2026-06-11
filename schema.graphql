@@ -125,7 +125,7 @@ today's ingestion ran successfully and to diagnose failures.
 """
 input ArcIngestionRunFilter {
   id: ID
-  status: String
+  status: IngestionStatus
   runDate: DateDateFilterLookup
   AND: ArcIngestionRunFilter
   OR: ArcIngestionRunFilter
@@ -494,6 +494,14 @@ type HdxDatasetTypeOffsetPaginated {
 
   """List of paginated results."""
   results: [HdxDatasetType!]!
+}
+
+enum IngestionStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  PARTIAL
 }
 
 input IntComparisonFilterLookup {

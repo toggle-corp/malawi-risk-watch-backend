@@ -9,6 +9,7 @@ from apps.pipeline.models import (
     FloodForecastFile,
     FloodForecastImpact,
     HdxDataset,
+    IngestionStatus,
     JbaIngestionRun,
 )
 
@@ -39,7 +40,7 @@ class FloodForecastImpactFilter:
 @strawberry_django.filters.filter(ArcIngestionRun, lookups=True)
 class ArcIngestionRunFilter:
     id: strawberry.ID | None = strawberry.UNSET
-    status: str | None = strawberry.UNSET
+    status: IngestionStatus | None = strawberry.UNSET
     run_date: strawberry.auto
 
 
