@@ -101,6 +101,12 @@ env = environ.Env(
     JBA_SFTP_PASSWORD=str,
     JBA_SFTP_URL=str,
     JBA_SFTP_PORT=(int, 22),
+    # ARC
+    ARC_S3_BUCKET=(str, "jbarisk-analytics"),
+    ARC_S3_PREFIX=(str, "malawi/2026"),
+    AWS_ACCESS_KEY_ID=str,
+    AWS_SECRET_ACCESS_KEY=str,
+    AWS_REGION=(str, "eu-west-2"),
 )
 
 ENABLE_DANGER_MODE = env("ENABLE_DANGER_MODE")
@@ -131,6 +137,14 @@ if JBA_SFTP_ENABLED:
     JBA_SFTP_PASSWORD = env("JBA_SFTP_PASSWORD")
     JBA_SFTP_URL = env("JBA_SFTP_URL")
     JBA_SFTP_PORT = env("JBA_SFTP_PORT")
+
+ARC_PIPELINE = {
+    "S3_BUCKET": env("ARC_S3_BUCKET"),
+    "S3_PREFIX": env("ARC_S3_PREFIX"),
+    "AWS_ACCESS_KEY_ID": env("ARC_AWS_ACCESS_KEY_ID"),
+    "AWS_SECRET_ACCESS_KEY": env("ARC_AWS_SECRET_ACCESS_KEY"),
+    "AWS_REGION": env("ARC_AWS_REGION"),
+}
 
 # See if we are inside a test environment (pytest)
 IS_TESTING = (
