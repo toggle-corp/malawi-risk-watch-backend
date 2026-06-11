@@ -47,7 +47,7 @@ RETRY_BACKOFF = 60  # seconds; actual delay = RETRY_BACKOFF * 2^attempt
 
 
 @shared_task(
-    name="arc_pipeline.launch_arc_pipeline_test",
+    name="arc_pipeline.launch_arc_pipeline",
     bind=True,
     max_retries=1,
     default_retry_delay=30,

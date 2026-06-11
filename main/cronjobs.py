@@ -70,6 +70,16 @@ SCHEDULES: dict[str, CronJob] = {
             max_runtime=12 * 60,
         ),
     ),
+    "ingest_arc_data": CronJob(
+        task="apps.pipeline.tasks.launch_arc_pipeline",
+        schedule=crontab(minute=0, hour=23),  # Trigger Time to be decided.
+        options=CronJobOption(expire_seconds=TimeConstants.SECONDS_IN_A_DAY),
+        sentry_config=CronJobSentryConfig(
+            failure_issue_threshold=2,
+            checkin_margin=10,
+            max_runtime=12 * 60,
+        ),
+    ),
     "celery_queue_uptime_default": CronJob(
         task="apps.pipeline.tasks.celery_queue_uptime_check",
         args=("default",),

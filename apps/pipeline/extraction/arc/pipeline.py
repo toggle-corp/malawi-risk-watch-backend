@@ -140,7 +140,7 @@ class ArcPipeline:
         Any exception propagates to the Celery task, which is responsible
         for status updates and retry scheduling.
         """
-        obs_date = timezone.now() - timedelta(days=2)
+        obs_date = timezone.now() - timedelta(days=1)
         key = self.get_csv_key(dt=obs_date)
         logger.info("Starting ARC pipeline for run=%s", self.arc_ingestion_run.pk)
 
@@ -243,11 +243,6 @@ class ArcPipeline:
                 pl.col("event_rp").max(),  # NULL when no RP triggered in area
                 pl.col("cell_trigger").any(),
             ],
-        )
-        logger.error(
-            "[run=%s] group_by keys: %s",
-            self.arc_ingestion_run.pk,
-            sorted([(r["observation_date"], r["admin_area_id"]) for r in agg.to_dicts()]),
         )
 
         records = agg.to_dicts()
