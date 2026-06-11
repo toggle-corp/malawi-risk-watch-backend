@@ -13,6 +13,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 
 from apps.admin_areas.models import AdminArea
+from apps.pipeline.cog import convert_to_cog_bytes_from_bytes
 from apps.pipeline.models import FloodForecastFile, FloodForecastImpact, JbaIngestionRun
 
 logger = logging.getLogger(__name__)
@@ -251,12 +252,13 @@ class JBAPipeline:
 
             with sftp.open(remote_path) as f:
                 content = f.read()
+                cog_file = convert_to_cog_bytes_from_bytes(content)
 
             forecast_files.append(
                 FloodForecastFile(
                     forecast_issue_date=forecast_issue_date,
                     forecast_target_date=forecast_target_date,
-                    tiff=ContentFile(content, name=tiff_file),
+                    tiff=ContentFile(cog_file, name=tiff_file),
                     ingestion_run=self.jba_ingestion_run,
                     original_filename=tiff_file,
                 ),

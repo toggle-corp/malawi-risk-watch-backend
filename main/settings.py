@@ -96,6 +96,7 @@ env = environ.Env(
     EMAIL_HOST_PASSWORD=(str, None),
     EMAIL_USE_TLS=(bool, False),
     # JBA
+    JBA_SFTP_ENABLED=(bool, False),
     JBA_SFTP_USERNAME=(str, "mrcs"),
     JBA_SFTP_PASSWORD=str,
     JBA_SFTP_URL=str,
@@ -124,10 +125,12 @@ ALLOWED_HOSTS = [
 ]
 
 # JBA
-JBA_SFTP_USERNAME = env("JBA_SFTP_USERNAME")
-JBA_SFTP_PASSWORD = env("JBA_SFTP_PASSWORD")
-JBA_SFTP_URL = env("JBA_SFTP_URL")
-JBA_SFTP_PORT = env("JBA_SFTP_PORT")
+JBA_SFTP_ENABLED = env("JBA_SFTP_ENABLED")
+if JBA_SFTP_ENABLED:
+    JBA_SFTP_USERNAME = env("JBA_SFTP_USERNAME")
+    JBA_SFTP_PASSWORD = env("JBA_SFTP_PASSWORD")
+    JBA_SFTP_URL = env("JBA_SFTP_URL")
+    JBA_SFTP_PORT = env("JBA_SFTP_PORT")
 
 # See if we are inside a test environment (pytest)
 IS_TESTING = (

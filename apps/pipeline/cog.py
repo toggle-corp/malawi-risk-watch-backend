@@ -43,6 +43,7 @@ def convert_to_cog(input_path: str | Path, output_path: str | Path) -> None:
     )
 
 
+# Left this for compatibility. TODO: Delete this
 def convert_to_cog_bytes(input_path: str | Path) -> bytes:
     """Convert a GeoTIFF to COG and return the result as bytes.
 
@@ -56,3 +57,25 @@ def convert_to_cog_bytes(input_path: str | Path) -> bytes:
         return tmp_path.read_bytes()
     finally:
         tmp_path.unlink(missing_ok=True)
+
+
+def convert_to_cog_bytes_from_bytes(input_bytes: bytes) -> bytes:
+    """Convert in-memory GeoTIFF bytes to COG and return the result as bytes.
+
+    Writes the input to a temporary file, runs COG conversion, and returns
+    the output as bytes — useful for saving directly to Django file storage
+    without retaining any files on disk.
+    """
+    with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp_input:
+        tmp_input_path = Path(tmp_input.name)
+        tmp_input.write(input_bytes)
+
+    with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp_out:
+        tmp_out_path = Path(tmp_out.name)
+
+    try:
+        convert_to_cog(tmp_input_path, tmp_out_path)
+        return tmp_out_path.read_bytes()
+    finally:
+        tmp_input_path.unlink(missing_ok=True)
+        tmp_out_path.unlink(missing_ok=True)
