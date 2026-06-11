@@ -12,6 +12,7 @@ from apps.notifications.models import NotificationRecipient
 from apps.pipeline.serializers import ReviewTriggerEventSerializer
 
 from .models import (
+    ArcIngestionRun,
     ArcRainfallObservation,
     ArcTriggerEvent,
     FloodForecastFile,
@@ -39,6 +40,13 @@ class FloodForecastFileAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
 class FloodForecastImpactAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     list_display = ["forecast_issue_date", "forecast_target_date", "admin_area", "band_5_mean"]
     ordering = ["-forecast_issue_date"]
+
+
+@admin.register(ArcIngestionRun)
+class ArcIngestionRunAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
+    list_display = ["run_date", "status", "rows_expected", "rows_processed", "started_at"]
+    list_filter = ["status"]
+    ordering = ["-run_date"]
 
 
 @admin.register(ArcRainfallObservation)

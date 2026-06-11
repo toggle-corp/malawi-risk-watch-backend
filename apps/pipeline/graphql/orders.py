@@ -2,6 +2,7 @@ import strawberry
 import strawberry_django
 
 from apps.pipeline.models import (
+    ArcIngestionRun,
     ArcRainfallObservation,
     ArcTriggerEvent,
     FloodForecastFile,
@@ -29,6 +30,12 @@ class FloodForecastImpactOrder:
     forecast_issue_date: strawberry.auto
     forecast_target_date: strawberry.auto
     created_at: strawberry.auto
+
+
+@strawberry_django.order_type(ArcIngestionRun)
+class ArcIngestionRunOrder:
+    run_date: strawberry.auto
+    started_at: strawberry.auto
 
 
 @strawberry_django.order_type(ArcRainfallObservation)

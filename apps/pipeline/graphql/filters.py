@@ -3,11 +3,13 @@ import strawberry_django
 from django.db.models import Q
 
 from apps.pipeline.models import (
+    ArcIngestionRun,
     ArcRainfallObservation,
     ArcTriggerEvent,
     FloodForecastFile,
     FloodForecastImpact,
     HdxDataset,
+    IngestionStatus,
     JbaIngestionRun,
 )
 
@@ -35,10 +37,18 @@ class FloodForecastImpactFilter:
     forecast_target_date: strawberry.auto
 
 
+@strawberry_django.filters.filter(ArcIngestionRun, lookups=True)
+class ArcIngestionRunFilter:
+    id: strawberry.ID | None = strawberry.UNSET
+    status: IngestionStatus | None = strawberry.UNSET
+    run_date: strawberry.auto
+
+
 @strawberry_django.filters.filter(ArcRainfallObservation, lookups=True)
 class ArcRainfallObservationFilter:
     id: strawberry.ID | None = strawberry.UNSET
     admin_area_id: strawberry.ID | None = strawberry.UNSET
+    ingestion_run_id: strawberry.ID | None = strawberry.UNSET
     cell_trigger: bool | None = strawberry.UNSET
     observation_date: strawberry.auto
 

@@ -5,6 +5,7 @@ import strawberry_django
 
 from apps.admin_areas.graphql.types import AdminAreaType
 from apps.pipeline.models import (
+    ArcIngestionRun,
     ArcRainfallObservation,
     ArcTriggerEvent,
     FloodForecastFile,
@@ -80,9 +81,23 @@ class FloodForecastImpactType:
 # ---------------------------------------------------------------------------
 
 
+@strawberry_django.type(ArcIngestionRun)
+class ArcIngestionRunType:
+    id: strawberry.ID
+    run_date: strawberry.auto
+    status: strawberry.auto
+    rows_expected: strawberry.auto
+    rows_processed: strawberry.auto
+    source_csv: strawberry.auto
+    error_log: strawberry.auto
+    started_at: strawberry.auto
+    completed_at: strawberry.auto
+
+
 @strawberry_django.type(ArcRainfallObservation)
 class ArcRainfallObservationType:
     id: strawberry.ID
+    ingestion_run_id: strawberry.ID | None
     observation_date: strawberry.auto
     admin_area_id: strawberry.ID
     admin_area: AdminAreaType
@@ -91,7 +106,6 @@ class ArcRainfallObservationType:
     impact: Decimal | None
     event_rp: strawberry.auto
     cell_trigger: strawberry.auto
-    source_csv: strawberry.auto
     ingested_at: strawberry.auto
 
 

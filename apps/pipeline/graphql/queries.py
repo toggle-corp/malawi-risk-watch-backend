@@ -3,6 +3,7 @@ import strawberry_django
 from strawberry_django.pagination import OffsetPaginated
 
 from .filters import (
+    ArcIngestionRunFilter,
     ArcRainfallObservationFilter,
     ArcTriggerEventFilter,
     FloodForecastFileFilter,
@@ -11,6 +12,7 @@ from .filters import (
     JbaIngestionRunFilter,
 )
 from .orders import (
+    ArcIngestionRunOrder,
     ArcRainfallObservationOrder,
     ArcTriggerEventOrder,
     FloodForecastFileOrder,
@@ -19,6 +21,7 @@ from .orders import (
     JbaIngestionRunOrder,
 )
 from .types import (
+    ArcIngestionRunType,
     ArcRainfallObservationType,
     ArcTriggerEventType,
     FloodForecastFileType,
@@ -50,7 +53,14 @@ class Query:
         order=FloodForecastImpactOrder,
     )
 
-    # -- ARC rainfall observations (includes source_csv_blob_url)
+    # -- ARC ingestion runs
+    arc_ingestion_runs: OffsetPaginated[ArcIngestionRunType] = strawberry_django.offset_paginated(
+        filters=ArcIngestionRunFilter,
+        order=ArcIngestionRunOrder,
+    )
+    arc_ingestion_run: ArcIngestionRunType = strawberry_django.field()
+
+    # -- ARC rainfall observations
     arc_rainfall_observations: OffsetPaginated[ArcRainfallObservationType] = strawberry_django.offset_paginated(
         filters=ArcRainfallObservationFilter,
         order=ArcRainfallObservationOrder,
@@ -63,7 +73,7 @@ class Query:
     )
     arc_trigger_event: ArcTriggerEventType = strawberry_django.field()
 
-    # -- HDX datasets (includes file_blob_url for raw data access)
+    # -- HDX datasets
     hdx_datasets: OffsetPaginated[HdxDatasetType] = strawberry_django.offset_paginated(
         filters=HdxDatasetFilter,
         order=HdxDatasetOrder,

@@ -24,10 +24,12 @@ from apps.pipeline.cog import convert_to_cog
 convert_to_cog("/tmp/raw_from_jba.tif", "/tmp/converted.tif")
 ```
 
-- **Compression:** deflate (lossless — flood depth values are preserved exactly)
-- **Overview resampling:** bilinear (smooth rendering when zoomed out)
+- **Tiling scheme:** GoogleMapsCompatible (reprojects to EPSG:3857, aligned to Web Mercator tile grid)
+- **Compression:** deflate + predictor (lossless — flood depth values are preserved exactly)
+- **Resampling:** cubic for both the reprojection and overview steps (sharp rendering at all zoom levels)
 - Input and output can be `str` or `pathlib.Path`
 - Output file is overwritten if it already exists
+- Uses `osgeo.gdal.Translate` with `format="COG"` (GDAL's native COG driver)
 
 Use this when you already have a file path to write to (e.g. writing to a mounted volume before uploading).
 

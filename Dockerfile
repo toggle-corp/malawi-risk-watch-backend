@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && uv lock --locked --offline \
         && uv sync --frozen --no-install-project --all-groups \
      # Clean-up
-    && apt-get remove -y build-essential gcc libc-dev libgdal-dev libproj-dev \
+    && apt-get remove -y build-essential gcc libc-dev \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
