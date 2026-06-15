@@ -98,6 +98,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
 # Runtime data
 pids
 *.pid

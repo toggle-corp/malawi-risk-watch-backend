@@ -44,6 +44,12 @@ x-server: &base_server_setup
     - db
     - redis
 
+x-worker: &base_worker_setup
+  <<: *base_server_setup
+  environment:
+    <<: *base_server_environments
+    DJANGO_APP_TYPE: "WORKER"
+
 services:
   db:
     image: postgis/postgis:17-3.5
@@ -82,12 +88,13 @@ services:
     ports:
       - 127.0.0.1:8060:8060
 
+  worker-beat:
+    <<: *base_worker_setup
+    command: bash -c "./misc/dev/run_worker_beat.sh"
+
   worker:
-    <<: *base_server_setup
+    <<: *base_worker_setup
     command: ["/code/misc/dev/run_worker.sh"]
-    environment:
-      <<: *base_server_environments
-      APP_TYPE: "WORKER"
 
 volumes:
   postgres_data:
