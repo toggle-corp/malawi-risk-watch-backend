@@ -208,6 +208,11 @@ class ArcIngestionRun(models.Model):
     def __str__(self) -> str:
         return f"ARC run {self.run_date} [{self.status}]"
 
+    def set_status(self, status: IngestionStatus):
+        self.status = status
+        update_fields = ["status"]
+        self.save(update_fields=update_fields)
+
 
 class ArcRainfallObservation(models.Model):
     """ARC parametric rainfall observation, keyed by admin area.
