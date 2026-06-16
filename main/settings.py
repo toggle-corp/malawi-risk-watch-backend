@@ -63,6 +63,11 @@ env = environ.Env(
     AWS_S3_REGION_NAME=str,
     AWS_S3_MEDIA_BUCKET_NAME=str,
     AWS_S3_STATIC_BUCKET_NAME=str,
+    # -- Azure blob storage
+    AZURE_BLOB_ENABLED=(bool, False),
+    AZURE_BLOB_CONNECTION_STRING=str,
+    AZURE_BLOB_MEDIA_CONTAINER_NAME=str,
+    AZURE_BLOB_STATIC_CONTAINER_NAME=str,
     # -- Filesystem (default) XXX: Don't use in production?
     MEDIA_ROOT=(str, BASE_DIR / ".data/media"),
     STATIC_ROOT=(str, BASE_DIR / ".data/static"),
@@ -319,6 +324,41 @@ if env("AWS_S3_ENABLED"):
         "OPTIONS": {
             **STORAGES["default"]["OPTIONS"],
             "file_overwrite": True,
+        },
+    }
+
+elif env("AZURE_BLOB_ENABLED"):
+    AZURE_CONFIG_OPTIONS = {
+        "connection_string": env("AZURE_BLOB_CONNECTION_STRING"),
+    }
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.azure_storage.AzureStorage",
+            "OPTIONS": {
+                **AZURE_CONFIG_OPTIONS,
+                "azure_container": env("AZURE_BLOB_MEDIA_CONTAINER_NAME"),
+                "overwrite_files": False,
+                "location": "media/",
+                "expiration_secs": 3600,  # 1 hour
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "storages.backends.azure_storage.AzureStorage",
+            "OPTIONS": {
+                **AZURE_CONFIG_OPTIONS,
+                "azure_container": env("AZURE_BLOB_STATIC_CONTAINER_NAME"),
+                "overwrite_files": True,
+                "location": "static/",
+                "expiration_secs": 3600,  # 1 hour
+            },
+        },
+    }
+    STORAGES[STORAGE_OVERWRITE_KEY] = {
+        **STORAGES["default"],
+        "OPTIONS": {
+            **STORAGES["default"]["OPTIONS"],
+            "overwrite_files": True,
         },
     }
 
