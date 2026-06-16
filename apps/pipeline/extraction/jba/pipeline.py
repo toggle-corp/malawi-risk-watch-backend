@@ -3,7 +3,7 @@ import logging
 import re
 import zipfile
 from contextlib import contextmanager
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import IO
 
 import paramiko
@@ -185,7 +185,7 @@ class JBAPipeline:
     ) -> list[FloodForecastImpact]:
         admin_areas = {aa.pcode: aa for aa in AdminArea.objects.all()}
 
-        parent_time = self.jba_ingestion_run.run_date - timedelta(days=3)
+        parent_time = self.jba_ingestion_run.run_date
         impact_path = parent_time.strftime("./mwi/impacts/%Y/%m/%d")
 
         try:
@@ -222,7 +222,7 @@ class JBAPipeline:
         return all_impacts
 
     def _collect_raster_files(self, sftp: paramiko.SFTPClient) -> list[FloodForecastFile]:
-        parent_time = self.jba_ingestion_run.run_date - timedelta(days=3)
+        parent_time = self.jba_ingestion_run.run_date
         path = parent_time.strftime("./mwi/raster/%Y/%m/%d")
 
         try:

@@ -62,7 +62,7 @@ class CronJob(typing.NamedTuple):
 SCHEDULES: dict[str, CronJob] = {
     "ingest_jba_data": CronJob(
         task="apps.pipeline.tasks.launch_jba_pipeline",
-        schedule=crontab(minute=0, hour=23),  # Trigger Time to be decided.
+        schedule=crontab(minute=45, hour=12),
         options=CronJobOption(expire_seconds=TimeConstants.SECONDS_IN_A_DAY),
         sentry_config=CronJobSentryConfig(
             failure_issue_threshold=2,
