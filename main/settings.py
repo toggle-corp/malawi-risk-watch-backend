@@ -151,7 +151,7 @@ if ARC_INGESTION_ENABLED:
         "S3_PREFIX": env("ARC_S3_PREFIX"),
         "AWS_ACCESS_KEY_ID": env("ARC_AWS_ACCESS_KEY_ID"),
         "AWS_SECRET_ACCESS_KEY": env("ARC_AWS_SECRET_ACCESS_KEY"),
-        "AWS_REGION": env("ARC_AWS_REGION"),
+        "AWS_REGION": env("AWS_REGION"),
     }
 
 # See if we are inside a test environment (pytest)
