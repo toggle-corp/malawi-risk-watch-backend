@@ -47,7 +47,6 @@ RETRY_BACKOFF = 60  # seconds; actual delay = RETRY_BACKOFF * 2^attempt
 
 
 @shared_task(
-    name="arc_pipeline.launch_arc_pipeline",
     bind=True,
     max_retries=1,
     default_retry_delay=30,
@@ -63,7 +62,6 @@ def launch_arc_pipeline(self) -> None:
 
 
 @shared_task(
-    name="arc_pipeline.run_arc_pipeline",
     bind=True,
     max_retries=MAX_RETRIES,
     default_retry_delay=RETRY_BACKOFF,
