@@ -28,7 +28,11 @@ dependencies = [
     "rio-cogeo>=7.0.2",
     "paramiko>=5.0.0",
     "polars>=1.41.0",
+    "banjo-utils",
 ]
+
+[tool.uv.sources]
+banjo-utils = { git = "https://github.com/toggle-corp/banjo-utils.git", tag = "v0.2.0" }
 
 [dependency-groups]
 dev = [
