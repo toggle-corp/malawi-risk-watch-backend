@@ -11,9 +11,6 @@ metadata:
 type: Opaque
 stringData:
   # secrets
-  AWS_S3_ACCESS_KEY_ID: "mrcs"
-  AWS_S3_REGION_NAME: "us-east-1"
-  AWS_S3_SECRET_ACCESS_KEY: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
   DEFAULT_FROM_EMAIL: "mrcs-drm@test.example.com"
   DJANGO_SECRET_KEY: "django-secret-key"
   EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
@@ -23,7 +20,6 @@ stringData:
   EMAIL_PORT: "587"
   POSTGRES_DB: "postgres"
   POSTGRES_HOST: "tcpg"
-  POSTGRES_PASSWORD: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
   POSTGRES_PORT: "5432"
   POSTGRES_USER: "postgres"
   SENTRY_DSN: "https://xyz@sentry.test.example.com/1"
@@ -44,7 +40,6 @@ data:
   APP_ENVIRONMENT: "ALPHA"
   APP_RELEASE: "develop.xxxxxxxx"
   AWS_S3_ENABLED: "true"
-  AWS_S3_ENDPOINT_URL: "https://mrcs-minio.test.example.com/"
   AWS_S3_MEDIA_BUCKET_NAME: "mrcs-media"
   AWS_S3_STATIC_BUCKET_NAME: "mrcs-static"
   CSRF_COOKIE_DOMAIN: ".example.com"
@@ -99,8 +94,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: c82795a682ad276f8efc627e08c90cdf5471cc309f6b7d1ccf50b742dceb58a5
-        checksum/configmap: ccb6d4d560087e231c0bbfdc7d38fa909dbdd7eecc7438b926a62b24ad7b3957
+        checksum/secret: f6bcaa5ffb0be4237ded684ecc780aab066adb2a75a7f1d93419294484f51ce0
+        checksum/configmap: 3ae4fe63311369956ecde41cc15810e3b70480e846487013ef106468753e4a66
       labels:
         app: release-name-app
         component: api
@@ -150,10 +145,35 @@ spec:
           env:
             - name: APP_TYPE
               value: "web"
-            - name: CELERY_REDIS_URL
-              value: redis://mrcs-dragonfly:6379/0
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ACCESS_KEY_ID
+                  name: minio-s3-credential
+            - name: AWS_S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ENDPOINT_URL
+                  name: minio-s3-credential
+            - name: AWS_S3_REGION_NAME
+              valueFrom:
+                secretKeyRef:
+                  key: S3_REGION
+                  name: minio-s3-credential
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: S3_SECRET_ACCESS_KEY
+                  name: minio-s3-credential
             - name: CACHE_REDIS_URL
               value: redis://mrcs-dragonfly:6379/1
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: POSTGRES_PASSWORD
+                  name: tcpg-pg-credential
             
           lifecycle:
             preStop:
@@ -189,8 +209,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: c82795a682ad276f8efc627e08c90cdf5471cc309f6b7d1ccf50b742dceb58a5
-        checksum/configmap: ccb6d4d560087e231c0bbfdc7d38fa909dbdd7eecc7438b926a62b24ad7b3957
+        checksum/secret: f6bcaa5ffb0be4237ded684ecc780aab066adb2a75a7f1d93419294484f51ce0
+        checksum/configmap: 3ae4fe63311369956ecde41cc15810e3b70480e846487013ef106468753e4a66
       labels:
         app: release-name-app
         component: worker-addon
@@ -237,10 +257,35 @@ spec:
           env:
             - name: APP_TYPE
               value: "worker"
-            - name: CELERY_REDIS_URL
-              value: redis://mrcs-dragonfly:6379/0
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ACCESS_KEY_ID
+                  name: minio-s3-credential
+            - name: AWS_S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ENDPOINT_URL
+                  name: minio-s3-credential
+            - name: AWS_S3_REGION_NAME
+              valueFrom:
+                secretKeyRef:
+                  key: S3_REGION
+                  name: minio-s3-credential
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: S3_SECRET_ACCESS_KEY
+                  name: minio-s3-credential
             - name: CACHE_REDIS_URL
               value: redis://mrcs-dragonfly:6379/1
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: POSTGRES_PASSWORD
+                  name: tcpg-pg-credential
             
             - name: BANJO_CELERY_HEARTBEAT_FILE
               value: "/var/run/celery/beat_heartbeat"
@@ -274,8 +319,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: c82795a682ad276f8efc627e08c90cdf5471cc309f6b7d1ccf50b742dceb58a5
-        checksum/configmap: ccb6d4d560087e231c0bbfdc7d38fa909dbdd7eecc7438b926a62b24ad7b3957
+        checksum/secret: f6bcaa5ffb0be4237ded684ecc780aab066adb2a75a7f1d93419294484f51ce0
+        checksum/configmap: 3ae4fe63311369956ecde41cc15810e3b70480e846487013ef106468753e4a66
       labels:
         app: release-name-app
         component: worker
@@ -330,10 +375,35 @@ spec:
           env:
             - name: APP_TYPE
               value: "worker"
-            - name: CELERY_REDIS_URL
-              value: redis://mrcs-dragonfly:6379/0
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ACCESS_KEY_ID
+                  name: minio-s3-credential
+            - name: AWS_S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ENDPOINT_URL
+                  name: minio-s3-credential
+            - name: AWS_S3_REGION_NAME
+              valueFrom:
+                secretKeyRef:
+                  key: S3_REGION
+                  name: minio-s3-credential
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: S3_SECRET_ACCESS_KEY
+                  name: minio-s3-credential
             - name: CACHE_REDIS_URL
               value: redis://mrcs-dragonfly:6379/1
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: POSTGRES_PASSWORD
+                  name: tcpg-pg-credential
             
             - name: BANJO_CELERY_HEARTBEAT_FILE
               value: "/var/run/celery/worker_heartbeat"
@@ -362,8 +432,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: c82795a682ad276f8efc627e08c90cdf5471cc309f6b7d1ccf50b742dceb58a5
-        checksum/configmap: ccb6d4d560087e231c0bbfdc7d38fa909dbdd7eecc7438b926a62b24ad7b3957
+        checksum/secret: f6bcaa5ffb0be4237ded684ecc780aab066adb2a75a7f1d93419294484f51ce0
+        checksum/configmap: 3ae4fe63311369956ecde41cc15810e3b70480e846487013ef106468753e4a66
       labels:
         app: release-name-app
         component: hook
@@ -392,10 +462,35 @@ spec:
           env:
             - name: APP_TYPE
               value: "hook"
-            - name: CELERY_REDIS_URL
-              value: redis://mrcs-dragonfly:6379/0
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ACCESS_KEY_ID
+                  name: minio-s3-credential
+            - name: AWS_S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ENDPOINT_URL
+                  name: minio-s3-credential
+            - name: AWS_S3_REGION_NAME
+              valueFrom:
+                secretKeyRef:
+                  key: S3_REGION
+                  name: minio-s3-credential
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: S3_SECRET_ACCESS_KEY
+                  name: minio-s3-credential
             - name: CACHE_REDIS_URL
               value: redis://mrcs-dragonfly:6379/1
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: POSTGRES_PASSWORD
+                  name: tcpg-pg-credential
 ---
 # Source: malawi-backend-helm/charts/app/templates/hooks/job.yaml
 # Hook: db-migrate
@@ -418,8 +513,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: c82795a682ad276f8efc627e08c90cdf5471cc309f6b7d1ccf50b742dceb58a5
-        checksum/configmap: ccb6d4d560087e231c0bbfdc7d38fa909dbdd7eecc7438b926a62b24ad7b3957
+        checksum/secret: f6bcaa5ffb0be4237ded684ecc780aab066adb2a75a7f1d93419294484f51ce0
+        checksum/configmap: 3ae4fe63311369956ecde41cc15810e3b70480e846487013ef106468753e4a66
       labels:
         app: release-name-app
         component: hook
@@ -447,10 +542,35 @@ spec:
           env:
             - name: APP_TYPE
               value: "hook"
-            - name: CELERY_REDIS_URL
-              value: redis://mrcs-dragonfly:6379/0
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ACCESS_KEY_ID
+                  name: minio-s3-credential
+            - name: AWS_S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ENDPOINT_URL
+                  name: minio-s3-credential
+            - name: AWS_S3_REGION_NAME
+              valueFrom:
+                secretKeyRef:
+                  key: S3_REGION
+                  name: minio-s3-credential
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: S3_SECRET_ACCESS_KEY
+                  name: minio-s3-credential
             - name: CACHE_REDIS_URL
               value: redis://mrcs-dragonfly:6379/1
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: POSTGRES_PASSWORD
+                  name: tcpg-pg-credential
 ---
 # Source: malawi-backend-helm/charts/app/templates/hooks/job.yaml
 # Hook: wait-for-resources
@@ -472,8 +592,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: c82795a682ad276f8efc627e08c90cdf5471cc309f6b7d1ccf50b742dceb58a5
-        checksum/configmap: ccb6d4d560087e231c0bbfdc7d38fa909dbdd7eecc7438b926a62b24ad7b3957
+        checksum/secret: f6bcaa5ffb0be4237ded684ecc780aab066adb2a75a7f1d93419294484f51ce0
+        checksum/configmap: 3ae4fe63311369956ecde41cc15810e3b70480e846487013ef106468753e4a66
       labels:
         app: release-name-app
         component: hook
@@ -505,10 +625,35 @@ spec:
           env:
             - name: APP_TYPE
               value: "hook"
-            - name: CELERY_REDIS_URL
-              value: redis://mrcs-dragonfly:6379/0
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ACCESS_KEY_ID
+                  name: minio-s3-credential
+            - name: AWS_S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  key: S3_ENDPOINT_URL
+                  name: minio-s3-credential
+            - name: AWS_S3_REGION_NAME
+              valueFrom:
+                secretKeyRef:
+                  key: S3_REGION
+                  name: minio-s3-credential
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: S3_SECRET_ACCESS_KEY
+                  name: minio-s3-credential
             - name: CACHE_REDIS_URL
               value: redis://mrcs-dragonfly:6379/1
+            - name: CELERY_REDIS_URL
+              value: redis://mrcs-dragonfly:6379/0
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: POSTGRES_PASSWORD
+                  name: tcpg-pg-credential
             
 
 ---

@@ -19,23 +19,41 @@ app:
       wait-for-resources:
         command: ["./manage.py", "wait_for_resources", "--db", "--cache", "--celery-broker", "--minio"]
 
+  # Infra credentials are provided by the cluster as fixed-name Secrets
+  # (tcpg-pg-credential, minio-s3-credential); consume them by reference rather
+  # than duplicating the values into this repo. Note: the Postgres instance must
+  # run a PostGIS image (this app uses django.contrib.gis.db.backends.postgis).
+  extraEnvVars:
+    POSTGRES_PASSWORD:
+      valueFrom:
+        secretKeyRef: {name: tcpg-pg-credential, key: POSTGRES_PASSWORD}
+    AWS_S3_ENDPOINT_URL:
+      valueFrom:
+        secretKeyRef: {name: minio-s3-credential, key: S3_ENDPOINT_URL}
+    AWS_S3_REGION_NAME:
+      valueFrom:
+        secretKeyRef: {name: minio-s3-credential, key: S3_REGION}
+    AWS_S3_ACCESS_KEY_ID:
+      valueFrom:
+        secretKeyRef: {name: minio-s3-credential, key: S3_ACCESS_KEY_ID}
+    AWS_S3_SECRET_ACCESS_KEY:
+      valueFrom:
+        secretKeyRef: {name: minio-s3-credential, key: S3_SECRET_ACCESS_KEY}
+
   env:
-    # AWS (S3 via cluster minio)
+    # AWS (S3 via cluster minio; endpoint/region/keys via extraEnvVars above)
     AWS_S3_ENABLED: "true"
-    AWS_S3_ENDPOINT_URL: "{{ required \".app.env.AWS_S3_ENDPOINT_URL\" nil }}"
     AWS_S3_MEDIA_BUCKET_NAME: "mrcs-media"
     AWS_S3_STATIC_BUCKET_NAME: "mrcs-static"
     # Sentry
     SENTRY_ENABLED: "true"
 
   secrets:
-    # Postgres — provided externally (service `tcpg`, secret tcpg-pg-credential)
+    # Postgres — provided externally; host/port below, password via extraEnvVars
     POSTGRES_DB: "postgres"
     POSTGRES_USER: "postgres"
     POSTGRES_HOST: "tcpg"
     POSTGRES_PORT: "5432"
-    # Minio (S3)
-    AWS_S3_REGION_NAME: "us-east-1"
     # Email
     EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
     DEFAULT_FROM_EMAIL: "{{ required \".app.secrets.DEFAULT_FROM_EMAIL\" nil }}"
