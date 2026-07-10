@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-./manage.py wait_for_resources --db
+./manage.py wait_for_resources --db --cache
 
 gunicorn "main.wsgi:application" \
     --bind=0.0.0.0:80 \
