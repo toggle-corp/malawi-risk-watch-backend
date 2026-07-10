@@ -7,6 +7,7 @@ from urllib.parse import ParseResult
 from urllib.parse import urlparse as _urlparse
 
 import environ
+from banjo_utils.health import is_health_probe_path
 
 from main.logging import log_render_extra_context
 from main.sentry import SentryConfig
@@ -191,6 +192,7 @@ INSTALLED_APPS = [
     "djangoql",
     "rest_framework",
     "drf_spectacular",
+    "banjo_utils",
     # - Health-check
     "health_check",  # required
     # Internal
@@ -202,6 +204,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # banjo_utils HealthProbeMiddleware serves pod-local /healthz/live/ and
+    # /healthz/ready/ (bypassing ALLOWED_HOSTS); keep it first.
+    "banjo_utils.health.HealthProbeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -422,6 +427,11 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = False
 REDIS_URL = CACHE_REDIS_URL
 HEALTHCHECK_CACHE_KEY = "mrcs_healthcheck_key"
 
+# banjo-utils HealthProbeMiddleware endpoints (k8s liveness/readiness).
+# django-health-check's /health-check/ stays as the external monitor endpoint.
+BANJO_HEALTH_PROBE_LIVE_URL = "/healthz/live/"
+BANJO_HEALTH_PROBE_READY_URL = "/healthz/ready/"
+
 # NOTE: For non-alpha instances, look at 50 as we have other resources like db/media on the same host
 # We will need to add additional disk if usages are high on the main disk
 HEALTH_CHECK = {
@@ -528,6 +538,35 @@ STRAWBERRY_DJANGO = {
     "DEFAULT_PK_FIELD_NAME": "id",
 }
 
+
+def skip_health_probe_logs(record):
+    """Drop *successful* request-line log records for k8s health-probe paths (/healthz/*).
+
+    The kubelet hits liveness/readiness/startup every few seconds; without this the
+    request-line logger is swamped by probe traffic. Reads path + status from
+    ``gunicorn.access`` (dict args, keys ``U``/``s``) or ``django.server`` (the
+    ``"GET /path HTTP/1.1"`` request line + status code), honouring the
+    BANJO_HEALTH_PROBE_* overrides via ``is_health_probe_path``.
+
+    Only 2xx probe hits are dropped; probe 4xx/5xx responses stay visible so real
+    probe failures are still logged.
+    """
+    args = record.args
+    path = ""
+    status = ""
+    if isinstance(args, dict):  # gunicorn.access
+        path = args.get("U", "")
+        status = str(args.get("s", ""))
+    elif isinstance(args, (tuple, list)) and args:  # django.server request line
+        request_line = str(args[0]).strip('"').split(" ")
+        if len(request_line) >= 2:
+            path = request_line[1]
+        if len(args) >= 2:
+            status = str(args[1])
+    is_probe_ok = is_health_probe_path(path) and status.startswith("2")
+    return not is_probe_ok
+
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -535,6 +574,10 @@ LOGGING = {
         "render_extra_context": {
             "()": "django.utils.log.CallbackFilter",
             "callback": log_render_extra_context,
+        },
+        "skip_health_probes": {
+            "()": "django.utils.log.CallbackFilter",
+            "callback": skip_health_probe_logs,
         },
     },
     "formatters": {
@@ -558,6 +601,20 @@ LOGGING = {
                 "propagate": False,
             }
             for app in ["apps", "main", "utils", "celery", "django"]
+        },
+        # runserver request-line logger (dev): drop successful /healthz/* probe spam
+        "django.server": {
+            "level": "INFO",
+            "handlers": ["console"],
+            "propagate": False,
+            "filters": ["skip_health_probes"],
+        },
+        # gunicorn access log (prod): drop successful /healthz/* probe spam
+        "gunicorn.access": {
+            "level": "INFO",
+            "handlers": ["console"],
+            "propagate": False,
+            "filters": ["skip_health_probes"],
         },
     },
     "root": {
@@ -607,7 +664,8 @@ if DEBUG:
 ENABLE_DEBUG_TOOLBAR = env("ENABLE_DEBUG_TOOLBAR")
 
 if DEBUG:
-    MIDDLEWARE.insert(0, "utils.middleware.RangeRequestMiddleware")
+    # Insert after HealthProbeMiddleware so the pod-local /healthz/* probes stay first.
+    MIDDLEWARE.insert(1, "utils.middleware.RangeRequestMiddleware")
 
 if ENABLE_DEBUG_TOOLBAR and not IS_TESTING:
     INSTALLED_APPS.append("debug_toolbar")
