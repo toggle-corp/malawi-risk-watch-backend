@@ -1,6 +1,6 @@
 dependencies:
 - name: banjo-helm
   repository: oci://ghcr.io/toggle-corp
-  version: 0.3.0
-digest: sha256:f251ba6ae521e76644b02ba0525f01fe233497b5c5e9fda368ab46703fe13dcf
-generated: "2026-05-07T00:00:00Z"
+  version: 0.4.1
+digest: sha256:e6f6b0cb4dc8e93c5e8509aee77dec20951c2a40046f93c7dc41a3d073e5c2c5
+generated: "2026-07-10T16:48:44.590767192+05:45"
