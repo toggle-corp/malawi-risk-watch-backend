@@ -669,9 +669,9 @@ metadata:
     release: release-name
   annotations:
     argocd.argoproj.io/sync-wave: "30"
-    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    traefik.ingress.kubernetes.io/router.middlewares: default-malawi-body-size@kubernetescrd
 spec:
-  ingressClassName: "nginx"
+  ingressClassName: "traefik"
   rules:
     - host: "mrcs-api.test.example.com"
       http:
@@ -712,3 +712,13 @@ spec:
       resources:
         requests:
           storage: 1Gi
+---
+# Source: malawi-backend-helm/charts/app/templates/extraManifests.yaml
+# Manifest: malawi-body-size
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: malawi-body-size
+spec:
+  buffering:
+    maxRequestBodyBytes: 52428800
