@@ -1,4 +1,5 @@
 import logging
+import secrets
 
 from celery import shared_task
 from django.utils import timezone
@@ -9,8 +10,21 @@ from apps.pipeline.models import ArcIngestionRun, IngestionStatus, JbaIngestionR
 
 logger = logging.getLogger(__name__)
 
+# Retry policy shared by both pipelines
+MAX_RETRIES = 3
+RETRY_BACKOFF_BASE = 600  # delay before the first retry
+RETRY_BACKOFF_MAX = 3600  # cap on any single retry delay
+RETRY_JITTER_RATIO = 0.25  # ±25%, so parallel runs never retry in lockstep
 
-@shared_task(bind=True, max_retries=3, retry_backoff=True)
+
+def retry_countdown(retries: int) -> int:
+    """Exponential backoff with jitter, in seconds."""
+    delay = min(RETRY_BACKOFF_BASE * (2**retries), RETRY_BACKOFF_MAX)
+    spread = round(delay * RETRY_JITTER_RATIO)
+    return delay - spread + secrets.randbelow(2 * spread + 1)
+
+
+@shared_task(bind=True, max_retries=MAX_RETRIES)
 def run_jba_pipeline(self, jba_ingestion_run_id: int) -> None:
     try:
         ingestion_run = JbaIngestionRun.objects.get(id=jba_ingestion_run_id)
@@ -22,28 +36,24 @@ def run_jba_pipeline(self, jba_ingestion_run_id: int) -> None:
 
     try:
         pipeline = JBAPipeline(jba_ingestion_run=ingestion_run)
+        # pipeline.run() commits files/impacts + SUCCESS status atomically; no set_status here.
         pipeline.run()
-        ingestion_run.set_status(IngestionStatus.SUCCESS)
     except Exception as exc:
         logger.exception("Pipeline failed for run_id=%s", jba_ingestion_run_id)
         if self.request.retries >= self.max_retries:
             ingestion_run.set_status(IngestionStatus.FAILED)
             raise
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc, countdown=retry_countdown(self.request.retries)) from exc
 
 
 @shared_task
 def launch_jba_pipeline():
     jba_ingestion_run = JbaIngestionRun.objects.create(
-        run_date=timezone.now(),
+        run_date=timezone.now().date(),
         status=IngestionStatus.PENDING,
     )
     run_jba_pipeline.delay(jba_ingestion_run.id)  # type: ignore[attr-defined]
     logger.info("Queued JBA pipeline. Run ID: %s", jba_ingestion_run.id)
-
-
-MAX_RETRIES = 3
-RETRY_BACKOFF = 60  # seconds; actual delay = RETRY_BACKOFF * 2^attempt
 
 
 @shared_task(
@@ -55,7 +65,7 @@ RETRY_BACKOFF = 60  # seconds; actual delay = RETRY_BACKOFF * 2^attempt
 def launch_arc_pipeline(self) -> None:
     run = ArcIngestionRun.objects.create(
         status=ArcIngestionRun.Status.PENDING,
-        run_date=timezone.now(),
+        run_date=timezone.now().date(),
     )
     run_arc_pipeline.delay(run.pk)  # type: ignore[attr-defined]
     logger.info("Queued ARC pipeline. Run ID: %s", run.pk)
@@ -64,7 +74,6 @@ def launch_arc_pipeline(self) -> None:
 @shared_task(
     bind=True,
     max_retries=MAX_RETRIES,
-    default_retry_delay=RETRY_BACKOFF,
     acks_late=True,
     reject_on_worker_lost=True,
 )
@@ -80,13 +89,12 @@ def run_arc_pipeline(self, arc_ingestion_run_id: int) -> None:
     try:
         pipeline = ArcPipeline(arc_ingestion_run=ingestion_run)
         pipeline.run()
-        ingestion_run.set_status(ArcIngestionRun.Status.SUCCESS)
     except Exception as exc:
         logger.exception("Pipeline failed for run_id=%s", arc_ingestion_run_id)
         if self.request.retries >= self.max_retries:
             ingestion_run.set_status(ArcIngestionRun.Status.FAILED)
             raise
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc, countdown=retry_countdown(self.request.retries)) from exc
 
 
 @shared_task
