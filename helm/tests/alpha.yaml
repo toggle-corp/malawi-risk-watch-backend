@@ -1,55 +1,25 @@
-#TODO(@sudip-khanal): update this file after alpha deployment.
 app:
-  environment: ALPHA
+  image:
+    name: local.git.com/toggle-corp/malawi-backend
+    tag: develop.xxxxxxxx
 
-  ingress:
-    enabled: true
-    className: nginx
-    host: test.mrcs.com
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "20m"
-
-  redis:
-    enabled: true
-    architecture: standalone
-    fullnameOverride: mrcs-redis
-    auth:
-      enabled: false
-
-  postgresql:
-    enabled: true
-    fullnameOverride: "mrcs-postgresql"
-    architecture: standalone
-    auth:
-      postgresPassword: "test-password"
-      password: "test"
-
-
-  minio:
-    enabled: true
-    tls:
-      enabled: false
-    apiIngress:
-      hostname: mrcs-minio.test.com
-    auth:
-      rootPassword: test-password
+  api:
+    ingress:
+      host: mrcs-api.test.example.com
 
   env:
-    APP_DOMAIN: https://mrcs.test.com
-    APP_RELEASE:  https://mrcs.test.com
-    FRONTEND_DOMAIN: https://mrcs-frontend.test.com
-    SESSION_COOKIE_DOMAIN: .example.com
-    CSRF_COOKIE_DOMAIN: .example.com
-    # AWS
-    AWS_S3_ENABLED: "false"
-    # Sentry
-    SENTRY_ENABLED: "true"
+    APP_DOMAIN: "https://mrcs-api.test.example.com"
+    FRONTEND_DOMAIN: "https://mrcs.test.example.com"
+    SESSION_COOKIE_DOMAIN: ".example.com"
+    CSRF_COOKIE_DOMAIN: ".example.com"
 
+  # POSTGRES_PASSWORD and the AWS_S3_* credentials are consumed via extraEnvVars
+  # valueFrom (cluster Secrets), so they are not set here.
   secrets:
     DJANGO_SECRET_KEY: "django-secret-key"
-    SENTRY_DSN: https://sentry.mrcs.test.com
-    DEFAULT_FROM_EMAIL: test
-    EMAIL_HOST: test
-    EMAIL_PORT: "1025"
-    EMAIL_HOST_USER: test
-    EMAIL_HOST_PASSWORD: test
+    SENTRY_DSN: "https://xyz@sentry.test.example.com/1"
+    DEFAULT_FROM_EMAIL: "mrcs-drm@test.example.com"
+    EMAIL_HOST: "smtp.test.example.com"
+    EMAIL_PORT: "587"
+    EMAIL_HOST_USER: "mrcs"
+    EMAIL_HOST_PASSWORD: "email-password"

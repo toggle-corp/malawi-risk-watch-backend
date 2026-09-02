@@ -1,107 +1,59 @@
 app:
   environment: ALPHA
 
-  ingress:
-    enabled: true
-    className: nginx
-
-
-  postgresql:
-    enabled: true
-    auth:
-      username: "mrcs"
-      database: "mrcs"
-    primary:
-      resources:
-        requests:
-          cpu: "0.2"
-          memory: 1Gi
-        limits:
-          cpu: "4"
-
-  minio:
-    enabled: true
-
   api:
-    replicaCount: 1
-    resources:
-      requests:
-        cpu: "0.2"
-        memory: 0.5Gi
+    ingress:
+      enabled: true
 
   worker:
     enabled: true
-    beat:
-      enabled: true
+    addons:
+      beat:
+        enabled: true
+
+  # collect-static needs S3/minio reachable; gate it alongside the DB/cache/broker.
+  hooks:
+    enabled: true
+    jobs:
+      wait-for-resources:
+        command: ["./manage.py", "wait_for_resources", "--db", "--cache", "--celery-broker", "--minio"]
+
+  # Infra credentials are provided by the cluster as fixed-name Secrets
+  # (tcpg-pg-credential, minio-s3-credential); consume them by reference rather
+  # than duplicating the values into this repo. Note: the Postgres instance must
+  # run a PostGIS image (this app uses django.contrib.gis.db.backends.postgis).
+  extraEnvVars:
+    POSTGRES_PASSWORD:
+      valueFrom:
+        secretKeyRef: {name: tcpg-pg-credential, key: POSTGRES_PASSWORD}
+    AWS_S3_ENDPOINT_URL:
+      valueFrom:
+        secretKeyRef: {name: minio-s3-credential, key: S3_ENDPOINT_URL}
+    AWS_S3_REGION_NAME:
+      valueFrom:
+        secretKeyRef: {name: minio-s3-credential, key: S3_REGION}
+    AWS_S3_ACCESS_KEY_ID:
+      valueFrom:
+        secretKeyRef: {name: minio-s3-credential, key: S3_ACCESS_KEY_ID}
+    AWS_S3_SECRET_ACCESS_KEY:
+      valueFrom:
+        secretKeyRef: {name: minio-s3-credential, key: S3_SECRET_ACCESS_KEY}
 
   env:
-    # AWS
+    # AWS (S3 via cluster minio; endpoint/region/keys via extraEnvVars above)
     AWS_S3_ENABLED: "true"
-    AWS_S3_ENDPOINT_URL: "https://{{ $.Values.minio.apiIngress.hostname }}/"
     AWS_S3_MEDIA_BUCKET_NAME: "mrcs-media"
     AWS_S3_STATIC_BUCKET_NAME: "mrcs-static"
+    # Sentry
+    SENTRY_ENABLED: "true"
 
   secrets:
-    # Postgres
-    POSTGRES_DB: "{{ $.Values.postgresql.auth.database }}"
+    # Postgres — provided externally; host/port below, password via extraEnvVars
+    POSTGRES_DB: "postgres"
     POSTGRES_USER: "postgres"
-    POSTGRES_PASSWORD: "{{ $.Values.postgresql.auth.postgresPassword }}"
-    POSTGRES_HOST: "{{ include \"postgresql.v1.primary.fullname\" $.Subcharts.postgresql }}"
-    POSTGRES_PORT: "{{ include \"postgresql.v1.service.port\" $.Subcharts.postgresql }}"
-    # Minio (S3)
-    AWS_S3_ACCESS_KEY_ID: "{{ required \".app.minio.auth.rootUser\" $.Values.minio.auth.rootUser }}"
-    AWS_S3_SECRET_ACCESS_KEY: "{{ required \".app.minio.auth.rootPassword\" $.Values.minio.auth.rootPassword }}"
-    AWS_S3_REGION_NAME: "us-east-1"
+    POSTGRES_HOST: "tcpg"
+    POSTGRES_PORT: "5432"
     # Email
     EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
-    DEFAULT_FROM_EMAIL: "{{ required \".app.secrets.DEFAULT_FROM_EMAIL\" nil }}"
-    EMAIL_HOST: "{{ required \".app.secrets.EMAIL_HOST\" nil }}"
-    EMAIL_PORT: "{{ required \".app.secrets.EMAIL_PORT\" nil }}"
-    EMAIL_HOST_USER: "{{ required \".app.secrets.EMAIL_HOST_USER\" nil }}"
-    EMAIL_HOST_PASSWORD: "{{ required \".app.secrets.EMAIL_HOST_PASSWORD\" nil }}"
-
-  argoHook:
-    enabled: true
-    hooks:
-      collect-static:
-        command: ["/bin/bash", "-c"]
-        args:
-          - "./manage.py wait_for_resources --minio && ./manage.py collectstatic --noinput"
-      create-users:
-        enabled: true
-        hook: PostSync
-        command:
-          - ./manage.py
-          - shell
-          - -c
-          - |
-            import os;
-            from django.contrib.auth import get_user_model;
-            from django.db import transaction;
-
-            User = get_user_model()
-
-            user_credentials = [
-              user_credential.split(":")
-              for user_credential in os.environ["ADMIN_USER_EMAIL_PASSWORD_SET"].split(",")
-            ];
-
-            print("Parsed provided credentials:", user_credentials);
-
-            @transaction.atomic
-            def create_initial_users(user_credentials):
-                for name, email, password_hash in user_credentials:
-                    user, created = User.objects.update_or_create(
-                        email=email,
-                        defaults={
-                          "name": name,
-                          "password": password_hash,
-                          "is_superuser": True,
-                          "is_staff": True,
-                        },
-                    )
-                    action = "updated"
-                    if created:
-                      action = "created"
-                    print(f"Successfully {action} user({email=})");
-            create_initial_users(user_credentials);
+    # SMTP creds (DEFAULT_FROM_EMAIL, EMAIL_HOST/PORT/HOST_USER/HOST_PASSWORD) are
+    # provided per-environment (CICD); see main/settings.py for options.

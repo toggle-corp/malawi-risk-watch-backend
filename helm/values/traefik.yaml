@@ -1,0 +1,19 @@
+# Traefik ingress overlay.
+# The ingress class is kept blank in values.yaml (never hardcoded) and set here;
+# the request body size is capped by a traefik Middleware (replacing the previous
+# proxy-body-size ingress annotation). Include this file in real-environment deploys.
+app:
+  api:
+    ingress:
+      className: traefik
+      annotations:
+        traefik.ingress.kubernetes.io/router.middlewares: "{{ $.Release.Namespace }}-malawi-body-size@kubernetescrd"
+  extraManifests:
+    malawi-body-size:
+      apiVersion: traefik.io/v1alpha1
+      kind: Middleware
+      metadata:
+        name: malawi-body-size
+      spec:
+        buffering:
+          maxRequestBodyBytes: 52428800  # 50Mi (previously proxy-body-size: 50m)

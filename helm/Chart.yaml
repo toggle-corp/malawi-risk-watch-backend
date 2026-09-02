@@ -2,7 +2,7 @@ apiVersion: v2
 name: malawi-backend-helm
 description: "Helm Chart to deploy the MRCS DRM Backend"
 type: application
-version: 0.1.0-SET-BY-CICD
+version: 0.0.1-SET-BY-CICD
 appVersion: "1.0.0"
 sources:
   - https://github.com/toggle-corp/malawi-risk-watch-backend
@@ -10,5 +10,5 @@ sources:
 dependencies:
   - name: banjo-helm
     alias: app
-    version: 0.3.0
+    version: 0.4.1
     repository: oci://ghcr.io/toggle-corp
