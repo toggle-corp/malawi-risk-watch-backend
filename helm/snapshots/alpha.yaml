@@ -491,6 +491,9 @@ spec:
                 secretKeyRef:
                   key: POSTGRES_PASSWORD
                   name: tcpg-pg-credential
+            
+
+
 ---
 # Source: malawi-backend-helm/charts/app/templates/hooks/job.yaml
 # Hook: db-migrate
@@ -571,6 +574,9 @@ spec:
                 secretKeyRef:
                   key: POSTGRES_PASSWORD
                   name: tcpg-pg-credential
+            
+
+
 ---
 # Source: malawi-backend-helm/charts/app/templates/hooks/job.yaml
 # Hook: wait-for-resources
@@ -712,6 +718,7 @@ spec:
       resources:
         requests:
           storage: 1Gi
+
 ---
 # Source: malawi-backend-helm/charts/app/templates/extraManifests.yaml
 # Manifest: malawi-body-size
