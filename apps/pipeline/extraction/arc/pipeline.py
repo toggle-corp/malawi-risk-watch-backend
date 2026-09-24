@@ -33,7 +33,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.pipeline.helpers import coerce_cell_trigger, coerce_event_rp
-from apps.pipeline.models import ArcIngestionRun, ArcRainfallObservation
+from apps.pipeline.models import ArcIngestionRun, ArcRainfallObservation, IngestionStatus
 from apps.pipeline.resolve_geo import resolve_admin_areas
 
 logger = logging.getLogger(__name__)
@@ -137,18 +137,21 @@ class ArcPipeline:
     def run(self) -> None:
         """Execute collect → transform → write in sequence.
 
-        Any exception propagates to the Celery task, which is responsible
-        for status updates and retry scheduling.
+        The observation write and the run-metadata/status update share a single
+        transaction so the DB never ends up with rows but a FAILED run (or vice
+        versa). Any exception propagates to the Celery task, which owns retry
+        scheduling and the failure-status update.
         """
-        obs_date = timezone.now() - timedelta(days=1)
+        obs_date = self.arc_ingestion_run.run_date - timedelta(days=1)
         key = self.get_csv_key(dt=obs_date)
         logger.info("Starting ARC pipeline for run=%s", self.arc_ingestion_run.pk)
 
         csv_object = self._collect(key)
         records = self._transform(csv_object.df, obs_date)
-        written = self._write(records, obs_date)
 
-        self._save_run_metadata(csv_object, written)
+        with transaction.atomic():
+            written = self._write(records, obs_date)
+            self._save_run_metadata(csv_object, written)
 
         logger.info("[run=%s] Completed — %d rows written.", self.arc_ingestion_run.pk, written)
 
@@ -294,15 +297,15 @@ class ArcPipeline:
 
         return triggered.drop_nulls(subset=["admin_area_id"])
 
-    @transaction.atomic
     def _write(self, records: list[dict], run_date: date) -> int:
-        """Atomically bulk-insert aggregated observation records.
+        """Bulk-insert aggregated observation records.
 
         Raises
         ------
         IntegrityError
             If a (observation_date, admin_area) pair already exists —
-            indicates the launcher scheduled the same date twice.
+            indicates the launcher scheduled the same date twice. The whole
+            run (rows + metadata) rolls back together.
 
         """
         if not records:
@@ -311,12 +314,13 @@ class ArcPipeline:
 
         observations = [
             ArcRainfallObservation(
+                ingestion_run=self.arc_ingestion_run,
                 observation_date=rec["observation_date"],
                 admin_area_id=rec["admin_area_id"],
                 rainfall_raw=rec["rainfall_raw"],
                 rainfall=rec["rainfall"],
                 impact=rec["impact"],
-                event_rp=rec.get("event_rp"),  # None → NULL
+                event_rp=int(rec["event_rp"]) if rec.get("event_rp") is not None else None,  # None → NULL
                 cell_trigger=rec["cell_trigger"],
             )
             for rec in records
@@ -328,12 +332,14 @@ class ArcPipeline:
         return len(observations)
 
     def _save_run_metadata(self, csv_object: CSVObject, written: int) -> None:
-        """Persist source CSV and row count onto the ingestion run record."""
+        """Persist source CSV, row count, and success status onto the run record."""
         filename = PurePosixPath(csv_object.key).name
-        self.arc_ingestion_run.rows_processed = written
-        self.arc_ingestion_run.completed_at = timezone.now()
-        self.arc_ingestion_run.source_csv.save(filename, ContentFile(csv_object.raw_bytes), save=False)
-        self.arc_ingestion_run.save(update_fields=["rows_processed", "completed_at", "source_csv"])
+        run = self.arc_ingestion_run
+        run.rows_processed = written
+        run.completed_at = timezone.now()
+        run.status = IngestionStatus.SUCCESS
+        run.source_csv.save(filename, ContentFile(csv_object.raw_bytes), save=False)
+        run.save(update_fields=["rows_processed", "completed_at", "status", "source_csv"])
 
     # in arc/test_pipeline.py (or pipeline.py later)
 

@@ -3,7 +3,7 @@ import logging
 import re
 import zipfile
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import IO
 
 import paramiko
@@ -11,10 +11,11 @@ import polars as pl
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.utils import timezone
 
 from apps.admin_areas.models import AdminArea
 from apps.pipeline.cog import convert_to_cog_bytes_from_bytes
-from apps.pipeline.models import FloodForecastFile, FloodForecastImpact, JbaIngestionRun
+from apps.pipeline.models import FloodForecastFile, FloodForecastImpact, IngestionStatus, JbaIngestionRun
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 class JBAPipeline:
     def __init__(self, jba_ingestion_run: JbaIngestionRun):
         self.jba_ingestion_run = jba_ingestion_run
+        self._csv_file: tuple[str, bytes] | None = None
 
     tiff_file_pattern = re.compile(
         r"^for_mwi_ts_"
@@ -174,10 +176,6 @@ class JBAPipeline:
 
         return impacts
 
-    @staticmethod
-    def get_admin_area(admin2_code: str, admin_areas: dict[str, AdminArea]) -> AdminArea | None:
-        return admin_areas.get(admin2_code)
-
     def _collect_impacts(
         self,
         sftp: paramiko.SFTPClient,
@@ -190,9 +188,8 @@ class JBAPipeline:
 
         try:
             files = sftp.listdir(impact_path)
-        except FileNotFoundError:
-            logger.warning("Impact path not found: %s", impact_path)
-            return []
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(f"JBA impact path not found: {impact_path}") from exc
 
         all_impacts = []
 
@@ -213,11 +210,16 @@ class JBAPipeline:
             with sftp.open(remote_zip_path, "rb") as remote_file:
                 zip_bytes = io.BytesIO(remote_file.read())
 
-            self.jba_ingestion_run.csv.save(filename, ContentFile(zip_bytes.getvalue()))
+            self._csv_file = (filename, zip_bytes.getvalue())
             zip_bytes.seek(0)
 
             impacts = self._process_zip(zip_bytes, issue_date, forecast_file_hash_map, admin_areas)
             all_impacts.extend(impacts)
+
+        if self._csv_file is None:
+            raise FileNotFoundError(
+                f"No impact zip in {impact_path} matched {self.csv_file_pattern.pattern!r} ({len(files)} entries listed)",
+            )
 
         return all_impacts
 
@@ -226,19 +228,21 @@ class JBAPipeline:
         path = parent_time.strftime("./mwi/raster/%Y/%m/%d")
 
         try:
-            tiff_remote_files = sftp.listdir(path)
-            logger.info("Found %d tiff files in %s", len(tiff_remote_files), path)
-        except FileNotFoundError:
-            logger.warning("Raster path not found: %s", path)
-            return []
+            remote_entries = sftp.listdir(path)
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(f"JBA raster path not found: {path}") from exc
+
+        matched = [(name, m) for name in remote_entries if (m := self.tiff_file_pattern.match(name))]
+        logger.info("Found %d matching tiff file(s) of %d entries in %s", len(matched), len(remote_entries), path)
+
+        if not matched:
+            raise FileNotFoundError(
+                f"No tiff in {path} matched {self.tiff_file_pattern.pattern!r} ({len(remote_entries)} entries listed)",
+            )
 
         forecast_files = []
 
-        for tiff_file in tiff_remote_files:
-            match = self.tiff_file_pattern.match(tiff_file)
-            if not match:
-                continue
-
+        for tiff_file, match in matched:
             forecast_target_date = datetime.strptime(match.group("forecast_target"), "%Y%m%d").date()
             forecast_issue_date = datetime.strptime(match.group("forecast_issue"), "%Y%m%d").date()
             remote_path = f"{path}/{tiff_file}"
@@ -259,6 +263,7 @@ class JBAPipeline:
                     forecast_issue_date=forecast_issue_date,
                     forecast_target_date=forecast_target_date,
                     tiff=ContentFile(cog_file, name=tiff_file),
+                    file_size_bytes=len(cog_file),
                     ingestion_run=self.jba_ingestion_run,
                     original_filename=tiff_file,
                 ),
@@ -276,16 +281,33 @@ class JBAPipeline:
 
         return forecast_files, impacts
 
-    @transaction.atomic()
     def _write_all(
         self,
         forecast_files: list[FloodForecastFile],
         impacts: list[FloodForecastImpact],
     ):
+        """Persist forecast files and impacts."""
         for ff in forecast_files:
             ff.save()
 
         FloodForecastImpact.objects.bulk_create(impacts, batch_size=1000)
+
+    def _save_run_metadata(self, forecast_files: list[FloodForecastFile]) -> None:
+        """Record run outcome and success status on the ingestion run record."""
+        run = self.jba_ingestion_run
+        run.files_processed = len(forecast_files)
+        issue_date = forecast_files[0].forecast_issue_date
+        run.forecast_issue_time = datetime.combine(issue_date, datetime.min.time(), tzinfo=UTC)
+        run.completed_at = timezone.now()
+        run.status = IngestionStatus.SUCCESS
+
+        update_fields = ["files_processed", "forecast_issue_time", "completed_at", "status"]
+        if self._csv_file is not None:
+            csv_filename, csv_bytes = self._csv_file
+            run.csv.save(csv_filename, ContentFile(csv_bytes), save=False)
+            update_fields.append("csv")
+
+        run.save(update_fields=update_fields)
 
     def run(self):
         logger.info(
@@ -296,6 +318,8 @@ class JBAPipeline:
 
         forecast_files, impacts = self._collect_all_data()
 
-        self._write_all(forecast_files, impacts)
+        with transaction.atomic():
+            self._write_all(forecast_files, impacts)
+            self._save_run_metadata(forecast_files)
 
         logger.info("Completed JBA pipeline run_id=%s", self.jba_ingestion_run.id)
