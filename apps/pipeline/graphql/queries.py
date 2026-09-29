@@ -27,6 +27,7 @@ from .types import (
     FloodForecastFileType,
     FloodForecastImpactType,
     HdxDatasetType,
+    IngestionRunOffsetPaginated,
     JbaIngestionRunType,
 )
 
@@ -34,7 +35,7 @@ from .types import (
 @strawberry.type
 class Query:
     # -- JBA ingestion runs
-    jba_ingestion_runs: OffsetPaginated[JbaIngestionRunType] = strawberry_django.offset_paginated(
+    jba_ingestion_runs: IngestionRunOffsetPaginated[JbaIngestionRunType] = strawberry_django.offset_paginated(
         filters=JbaIngestionRunFilter,
         order=JbaIngestionRunOrder,
     )
@@ -54,7 +55,7 @@ class Query:
     )
 
     # -- ARC ingestion runs
-    arc_ingestion_runs: OffsetPaginated[ArcIngestionRunType] = strawberry_django.offset_paginated(
+    arc_ingestion_runs: IngestionRunOffsetPaginated[ArcIngestionRunType] = strawberry_django.offset_paginated(
         filters=ArcIngestionRunFilter,
         order=ArcIngestionRunOrder,
     )

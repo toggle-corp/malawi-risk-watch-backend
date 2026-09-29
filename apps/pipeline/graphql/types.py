@@ -1,7 +1,9 @@
+import datetime
 from decimal import Decimal
 
 import strawberry
 import strawberry_django
+from strawberry_django.pagination import NodeType, OffsetPaginated
 
 from apps.admin_areas.graphql.types import AdminAreaType
 from apps.pipeline.models import (
@@ -11,9 +13,26 @@ from apps.pipeline.models import (
     FloodForecastFile,
     FloodForecastImpact,
     HdxDataset,
+    IngestionStatus,
     JbaIngestionRun,
 )
 from apps.users.graphql.types import UserType
+
+
+# Kept generic so the optimizer can still resolve NodeType; the "OffsetPaginated" name
+@strawberry.type(name="OffsetPaginated")
+class IngestionRunOffsetPaginated(OffsetPaginated[NodeType]):
+    @strawberry.field(description="Run date of the latest successful ingestion run (ignores filters).")
+    async def last_successful_run_date(self) -> datetime.date | None:
+        if self.queryset is None:
+            return None
+        return await (
+            self.queryset.model.objects.filter(status=IngestionStatus.SUCCESS)
+            .order_by("-run_date")
+            .values_list("run_date", flat=True)
+            .afirst()
+        )
+
 
 # ---------------------------------------------------------------------------
 # JBA ingestion
