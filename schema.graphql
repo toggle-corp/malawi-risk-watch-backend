@@ -164,6 +164,9 @@ type ArcIngestionRunTypeOffsetPaginated {
 
   """List of paginated results."""
   results: [ArcIngestionRunType!]!
+
+  """Run date of the latest successful ingestion run (ignores filters)."""
+  lastSuccessfulRunDate: Date
 }
 
 """
@@ -580,6 +583,9 @@ type JbaIngestionRunTypeOffsetPaginated {
 
   """List of paginated results."""
   results: [JbaIngestionRunType!]!
+
+  """Run date of the latest successful ingestion run (ignores filters)."""
+  lastSuccessfulRunDate: Date
 }
 
 type Mutation {
