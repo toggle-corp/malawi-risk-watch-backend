@@ -6,7 +6,7 @@
 Phases (all private methods on the class)
 -----------------------------------------
     _collect             — locate and download the S3 CSV
-    _transform           — coerce types, filter, resolve admin areas, aggregate
+    _transform           — coerce types, resolve admin areas, aggregate
     _resolve_admin_areas — join coord map from PostGIS onto the DataFrame
     _write               — atomic bulk-insert into the DB
     _save_run_metadata   — persist source CSV and row count on the run record
@@ -187,7 +187,7 @@ class ArcPipeline:
         observation_date: date | None = None,
         target_level: int = 3,
     ) -> list[dict]:
-        """Coerce, filter, resolve admin areas, and aggregate raw rows."""
+        """Coerce, resolve admin areas, and aggregate raw rows."""
         logger.info("[run=%s] Transforming dataframe", self.arc_ingestion_run.pk)
 
         # 1. Rename source columns to internal names
@@ -214,31 +214,22 @@ class ArcPipeline:
                 pl.col("observation_date").str.to_date(strict=False),
             )
 
-        # 3. Filter: keep only triggered cells
-        triggered = df.filter(pl.col("cell_trigger"))
-        logger.info(
-            "[run=%s] Rows after cell_trigger filter: %d / %d.",
-            self.arc_ingestion_run.pk,
-            len(triggered),
-            len(df),
-        )
-
-        if triggered.is_empty():
-            logger.info("[run=%s] No triggered cells — nothing to write.", self.arc_ingestion_run.pk)
+        # 3. Keep every cell (triggered or not); only drop rows we cannot locate
+        df = df.drop_nulls(subset=["latitude", "longitude"])
+        if df.is_empty():
+            logger.info("[run=%s] No rows with coordinates — nothing to write.", self.arc_ingestion_run.pk)
             return []
 
-        triggered = triggered.drop_nulls(subset=["latitude", "longitude"])
+        df = self._resolve_admin_areas(df, target_level)
 
-        triggered = self._resolve_admin_areas(triggered, target_level)
-
-        if triggered.is_empty():
+        if df.is_empty():
             logger.info(
                 "[run=%s] No rows left after admin area resolution.",
                 self.arc_ingestion_run.pk,
             )
             return []
 
-        agg = triggered.group_by(["observation_date", "admin_area_id"]).agg(
+        agg = df.group_by(["observation_date", "admin_area_id"]).agg(
             [
                 pl.col("rainfall_raw").sum(),
                 pl.col("rainfall").sum(),
@@ -258,10 +249,10 @@ class ArcPipeline:
 
     def _resolve_admin_areas(
         self,
-        triggered: pl.DataFrame,
+        df: pl.DataFrame,
         target_level: int,
     ) -> pl.DataFrame:
-        unique_coords: list[tuple[float, float]] = triggered.select(["latitude", "longitude"]).unique().rows()
+        unique_coords: list[tuple[float, float]] = df.select(["latitude", "longitude"]).unique().rows()
         coord_map = resolve_admin_areas(unique_coords, target_level=target_level)
 
         # Explode: one row per (coord, admin_area_id) pair
@@ -273,7 +264,7 @@ class ArcPipeline:
 
         if not lookup_rows:
             logger.warning("[run=%s] No coords resolved to any admin area.", self.arc_ingestion_run.pk)
-            return triggered.clear()
+            return df.clear()
 
         lookup = pl.DataFrame(
             lookup_rows,
@@ -284,18 +275,18 @@ class ArcPipeline:
             },
         )
 
-        # One triggered row can now join to multiple admin areas
-        triggered = triggered.join(lookup, on=["latitude", "longitude"], how="left")
+        # One row can now join to multiple admin areas
+        df = df.join(lookup, on=["latitude", "longitude"], how="left")
 
-        unresolved = triggered["admin_area_id"].null_count()
+        unresolved = df["admin_area_id"].null_count()
         if unresolved:
             logger.warning(
-                "[run=%s] %d triggered row(s) could not be resolved to any admin area and will be skipped.",
+                "[run=%s] %d row(s) could not be resolved to any admin area and will be skipped.",
                 self.arc_ingestion_run.pk,
                 unresolved,
             )
 
-        return triggered.drop_nulls(subset=["admin_area_id"])
+        return df.drop_nulls(subset=["admin_area_id"])
 
     def _write(self, records: list[dict], run_date: date) -> int:
         """Bulk-insert aggregated observation records.
