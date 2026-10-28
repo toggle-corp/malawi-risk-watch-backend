@@ -4,8 +4,9 @@ Creates:
   - Malawi administrative hierarchy (country → 3 regions → 28 districts)
   - 3 users (admin, reviewer, viewer)
   - 2 JBA ingestion runs with forecast files and per-district impacts
-  - ARC rainfall observations for all districts across 3 dates
-  - 3 ARC trigger events (pending, confirmed, rejected)
+  - ARC rainfall observations for all districts across 2 dates (today + yesterday)
+  - 2 ARC trigger events: today (pending, national RP 20) and yesterday
+    (confirmed, national RP 10); a district triggers only when its RP >= 5
   - Notification recipients scoped to various admin areas
   - Notification logs for the confirmed event
 
@@ -103,20 +104,15 @@ BAND5_SAMPLES = [
     (Decimal("4800"), Decimal("3500"), Decimal("6200"), Decimal("9400"), Decimal("18000")),
 ]
 
-# Realistic ARC rainfall values (mm) — sampled from the CSV
-ARC_RAINFALL_SAMPLES = [
-    Decimal("0.000"),
-    Decimal("2.540"),
-    Decimal("5.080"),
-    Decimal("7.620"),
-    Decimal("10.160"),
-    Decimal("12.700"),
-    Decimal("15.240"),
-    Decimal("20.320"),
-    Decimal("25.400"),
-    Decimal("38.100"),
-    Decimal("50.800"),
-]
+# A cell triggers once its rainfall return period crosses this many years
+ARC_TRIGGER_RP = 5
+# Representative rainfall (mm) for each return period; higher RP = rarer, heavier rain
+RP_RAINFALL = {
+    2: Decimal("20.320"),
+    5: Decimal("25.400"),
+    10: Decimal("38.100"),
+    20: Decimal("50.800"),
+}
 
 
 class Command(BaseCommand):
@@ -291,80 +287,93 @@ class Command(BaseCommand):
         southern_ids: list[int],
     ) -> None:
         today = date.today()
-        obs_dates = [today - timedelta(days=d) for d in (14, 7, 0)]
-
-        for obs_date in obs_dates:
-            run, created = ArcIngestionRun.objects.get_or_create(
-                run_date=obs_date,
-                defaults={
-                    "status": IngestionStatus.SUCCESS,
-                    "rows_expected": len(district_ids),
-                    "rows_processed": len(district_ids),
-                    "source_csv": f"arc/csv/{obs_date}.csv",
-                    "completed_at": timezone.now() - timedelta(days=(today - obs_date).days),
-                },
-            )
-            action = "Created" if created else "Skipped"
-            self.stdout.write(f"  {action} ARC run: {run.run_date}")
-
-            for district_id in district_ids:
-                rainfall = random.choice(ARC_RAINFALL_SAMPLES)  # noqa: S311
-                cell_trigger = rainfall >= Decimal("25.400")
-                ArcRainfallObservation.objects.get_or_create(
-                    observation_date=obs_date,
-                    admin_area_id=district_id,
-                    defaults={
-                        "ingestion_run": run,
-                        "rainfall_raw": rainfall * Decimal("1.05"),
-                        "rainfall": rainfall,
-                        "impact": Decimal(round(int(rainfall * 42), -2)) if rainfall > 0 else Decimal("0"),
-                        "event_rp": random.choice([None, 2, 5, 10, 20]) if cell_trigger else None,  # noqa: S311
-                        "cell_trigger": cell_trigger,
-                    },
-                )
-
-        self.stdout.write(f"  ARC observations created for {len(obs_dates)} dates × {len(district_ids)} districts")
-
         reviewer = User.objects.filter(email="reviewer@example.com").first()
-        triggered_ids = [d for d in district_ids if district_ids.index(d) % 3 == 0]
 
-        events_spec = [
+        # Rebuild ARC data so re-runs give exactly the two-day scenario below,
+        # regardless of what earlier runs (on other days) left behind.
+        NotificationLog.objects.all().delete()
+        ArcTriggerEvent.objects.all().delete()
+        ArcRainfallObservation.objects.all().delete()
+        ArcIngestionRun.objects.all().delete()
+
+        # Each scenario drives one observation date and its national trigger event.
+        # triggered_rps are the return periods (>= 5) of the triggering districts;
+        # their max is the national return period shown in the header.
+        scenarios = [
             dict(
-                trigger_date=today - timedelta(days=14),
-                status=TriggerEventStatus.REJECTED,
-                reviewed_by=reviewer,
-                reviewed_at=timezone.now() - timedelta(days=13),
-                review_notes="False positive — seasonal baseline exceeded, no real risk.",
-            ),
-            dict(
-                trigger_date=today - timedelta(days=7),
-                status=TriggerEventStatus.CONFIRMED,
-                reviewed_by=reviewer,
-                reviewed_at=timezone.now() - timedelta(days=6),
-                review_notes="Confirmed after cross-checking JBA forecasts.",
-            ),
-            dict(
-                trigger_date=today,
+                obs_date=today,
                 status=TriggerEventStatus.PENDING_REVIEW,
                 reviewed_by=None,
                 reviewed_at=None,
                 review_notes=None,
+                triggered_rps=[20, 10, 10, 5, 5, 5, 5],
+            ),
+            dict(
+                obs_date=today - timedelta(days=1),
+                status=TriggerEventStatus.CONFIRMED,
+                reviewed_by=reviewer,
+                reviewed_at=timezone.now() - timedelta(hours=12),
+                review_notes="Confirmed after cross-checking JBA forecasts.",
+                triggered_rps=[10, 10, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
             ),
         ]
 
-        for spec in events_spec:
-            ArcTriggerEvent.objects.update_or_create(
-                trigger_date=spec["trigger_date"],
-                defaults={
-                    "triggered_admin_areas_count": len(triggered_ids),
-                    "affected_admin_areas": triggered_ids,
-                    "status": spec["status"],
-                    "reviewed_by": spec["reviewed_by"],
-                    "reviewed_at": spec["reviewed_at"],
-                    "review_notes": spec["review_notes"],
-                },
+        for scenario in scenarios:
+            obs_date = typing.cast("date", scenario["obs_date"])
+            run = ArcIngestionRun.objects.create(
+                run_date=obs_date,
+                status=IngestionStatus.SUCCESS,
+                rows_expected=len(district_ids),
+                rows_processed=len(district_ids),
+                source_csv=f"arc/csv/{obs_date}.csv",
+                completed_at=timezone.now() - timedelta(days=(today - obs_date).days),
             )
-            self.stdout.write(f"  Trigger event: {spec['trigger_date']} [{spec['status']}]")
+
+            triggered_rps = typing.cast("list[int]", scenario["triggered_rps"])
+            triggered_sample = random.sample(district_ids, len(triggered_rps))  # noqa: S311
+            rp_by_district = dict(zip(triggered_sample, triggered_rps, strict=True))
+
+            for district_id in district_ids:
+                if district_id in rp_by_district:
+                    # Triggered: return period >= 5 crosses the parametric threshold
+                    event_rp = rp_by_district[district_id]
+                    rainfall = RP_RAINFALL[event_rp]
+                else:
+                    # Below threshold: a minor 2-year event or nothing notable
+                    event_rp = random.choice([None, None, 2])  # noqa: S311
+                    rainfall = (
+                        RP_RAINFALL[2]
+                        if event_rp == 2
+                        else random.choice(  # noqa: S311
+                            [Decimal("0.000"), Decimal("5.080"), Decimal("12.700")],
+                        )
+                    )
+                cell_trigger = event_rp is not None and event_rp >= ARC_TRIGGER_RP
+                ArcRainfallObservation.objects.create(
+                    observation_date=obs_date,
+                    admin_area_id=district_id,
+                    ingestion_run=run,
+                    rainfall_raw=rainfall * Decimal("1.05"),
+                    rainfall=rainfall,
+                    impact=Decimal(round(int(rainfall * 42), -2)) if rainfall > 0 else Decimal("0"),
+                    event_rp=event_rp,
+                    cell_trigger=cell_trigger,
+                )
+
+            triggered_ids = list(rp_by_district.keys())
+            ArcTriggerEvent.objects.create(
+                trigger_date=obs_date,
+                triggered_admin_areas_count=len(triggered_ids),
+                affected_admin_areas=triggered_ids,
+                status=scenario["status"],
+                reviewed_by=scenario["reviewed_by"],
+                reviewed_at=scenario["reviewed_at"],
+                review_notes=scenario["review_notes"],
+            )
+            self.stdout.write(
+                f"  ARC {obs_date} [{scenario['status']}] — "
+                f"{len(triggered_ids)} districts, national RP {max(triggered_rps)}",
+            )
 
     # ------------------------------------------------------------------
     # Notification recipients
@@ -404,11 +413,9 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _create_notification_logs(self) -> None:
-        today = date.today()
-        confirmed_event = ArcTriggerEvent.objects.filter(
-            trigger_date=today - timedelta(days=7),
-            status=TriggerEventStatus.CONFIRMED,
-        ).first()
+        confirmed_event = (
+            ArcTriggerEvent.objects.filter(status=TriggerEventStatus.CONFIRMED).order_by("-trigger_date").first()
+        )
         if not confirmed_event:
             self.stdout.write(self.style.WARNING("  Skipping notification logs — confirmed event not found."))
             return
